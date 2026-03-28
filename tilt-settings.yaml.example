@@ -1,0 +1,5 @@
+clusters:
+  - kind  # replace with your kubectl context name
+
+controller:
+  image: controller
