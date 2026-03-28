@@ -50,7 +50,11 @@ func (ts *TopologyScanner) Start(ctx context.Context) error {
 
 func (ts *TopologyScanner) scan(ctx context.Context) {
 	workloads := ts.store.Workloads()
+	ts.log.Info("scan", "workloads", len(workloads))
 	for _, wk := range workloads {
+		if !topology.SupportedWorkloadTypes[wk.OwnerKind] {
+			continue
+		}
 		name := proposalName(wk)
 		ns := wk.Namespace
 		if ns == "" {

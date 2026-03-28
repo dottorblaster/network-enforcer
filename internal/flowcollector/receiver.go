@@ -64,6 +64,7 @@ func (r *Receiver) Export(_ context.Context, req *colmetricspb.ExportMetricsServ
 	for _, rm := range req.GetResourceMetrics() {
 		for _, sm := range rm.GetScopeMetrics() {
 			for _, m := range sm.GetMetrics() {
+				r.log.Info("received metric", "name", m.GetName())
 				if m.GetName() != targetMetricName {
 					continue
 				}
@@ -94,12 +95,13 @@ func (r *Receiver) processMetric(m *metricspb.Metric, now time.Time) {
 
 func (r *Receiver) parseDataPoint(dp *metricspb.NumberDataPoint, now time.Time) topology.FlowRecord {
 	attrs := attrMap(dp.GetAttributes())
+	r.log.Info("parsed datapoint", "attrs", attrs)
 
 	srcNs := attrs["k8s.src.namespace"]
-	srcKind := attrs["k8s.src.owner.kind"]
+	srcKind := attrs["k8s.src.owner.type"]
 	srcName := attrs["k8s.src.owner.name"]
 	dstNs := attrs["k8s.dst.namespace"]
-	dstKind := attrs["k8s.dst.owner.kind"]
+	dstKind := attrs["k8s.dst.owner.type"]
 	dstName := attrs["k8s.dst.owner.name"]
 	srcAddr := attrs["src.address"]
 	dstAddr := attrs["dst.address"]

@@ -47,7 +47,7 @@ func Generate(wk topology.WorkloadKey, flows []topology.FlowRecord) (ingress, eg
 }
 
 func makePeerKey(wk topology.WorkloadKey, address string) peerKey {
-	if wk.OwnerName == "" {
+	if wk.OwnerName == "" || !topology.SupportedWorkloadTypes[wk.OwnerKind] {
 		return peerKey{CIDR: fmt.Sprintf("%s/32", address)}
 	}
 	return peerKey{Namespace: wk.Namespace, OwnerKind: wk.OwnerKind, OwnerName: wk.OwnerName}

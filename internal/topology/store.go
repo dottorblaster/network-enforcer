@@ -61,10 +61,10 @@ func (s *Store) Workloads() []WorkloadKey {
 
 	seen := make(map[WorkloadKey]struct{})
 	for _, f := range s.flows {
-		if f.Source.OwnerName != "" {
+		if f.Source.OwnerName != "" && f.Source.OwnerKind != "" {
 			seen[f.Source] = struct{}{}
 		}
-		if f.Dest.OwnerName != "" {
+		if f.Dest.OwnerName != "" && f.Dest.OwnerKind != "" {
 			seen[f.Dest] = struct{}{}
 		}
 	}

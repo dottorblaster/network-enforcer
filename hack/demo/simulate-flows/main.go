@@ -88,10 +88,10 @@ func buildRequest() *colmetricspb.ExportMetricsServiceRequest {
 			Value: &metricspb.NumberDataPoint_AsInt{AsInt: f.bytes},
 			Attributes: []*commonpb.KeyValue{
 				strAttr("k8s.src.namespace", f.srcNs),
-				strAttr("k8s.src.owner.kind", f.srcKind),
+				strAttr("k8s.src.owner.type", f.srcKind),
 				strAttr("k8s.src.owner.name", f.srcName),
 				strAttr("k8s.dst.namespace", f.dstNs),
-				strAttr("k8s.dst.owner.kind", f.dstKind),
+				strAttr("k8s.dst.owner.type", f.dstKind),
 				strAttr("k8s.dst.owner.name", f.dstName),
 				strAttr("src.address", f.srcAddr),
 				strAttr("dst.address", f.dstAddr),
