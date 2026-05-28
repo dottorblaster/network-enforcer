@@ -45,6 +45,22 @@ help: ## Display this help.
 manifests: controller-gen ## Generate WebhookConfiguration, ClusterRole and CustomResourceDefinition objects.
 	"$(CONTROLLER_GEN)" rbac:roleName=manager-role crd webhook paths="./..." output:crd:artifacts:config=config/crd/bases
 
+REPO ?= ghcr.io/rancher-sandbox/network-enforcer
+TAG ?= latest
+
+define BUILD_template =
+.PHONY: build-$(1)-image
+build-$(1)-image:
+	docker buildx build -f package/Dockerfile.$(1) \
+	-t "$(REPO)/$(1):$(TAG)" --load .
+	@echo "Built $(REPO)/$(1):$(TAG)"
+
+E2E_DEPS += build-$(1)-image
+endef
+
+TARGET=controller cniwatcher
+$(foreach T,$(TARGET),$(eval $(call BUILD_template,$(T))))
+
 .PHONY: generate
 generate: controller-gen ## Generate code containing DeepCopy, DeepCopyInto, and DeepCopyObject method implementations.
 	"$(CONTROLLER_GEN)" object:headerFile="hack/boilerplate.go.txt" paths="./..."
@@ -111,6 +127,13 @@ build: manifests generate fmt vet ## Build manager binary.
 .PHONY: controller
 controller: fmt ## Build controller binary.
 	CGO_ENABLED=0 GOOS=linux go build -o bin/controller cmd/main.go
+
+CNIWATCHER_VERSION ?= $(shell git describe --tags --dirty --always 2>/dev/null || echo "v0.0.0")
+CNIWATCHER_LDFLAGS := -X main.CniWatcherVersion=$(CNIWATCHER_VERSION)
+
+.PHONY: cniwatcher
+cniwatcher: fmt vet ## Build cniwatcher binary.
+	CGO_ENABLED=0 GOOS=linux go build -ldflags "$(CNIWATCHER_LDFLAGS)" -o bin/cniwatcher ./cmd/cniwatcher
 
 .PHONY: run
 run: manifests generate fmt vet ## Run a controller from your host.
@@ -257,3 +280,23 @@ endef
 define gomodver
 $(shell go list -m -f '{{if .Replace}}{{.Replace.Version}}{{else}}{{.Version}}{{end}}' $(1) 2>/dev/null)
 endef
+
+##@ cniWatcher
+
+GOLDMANE_VERSION ?= v3.30.2
+.PHONY: download-calico-goldmane-proto
+download-calico-goldmane-proto: ## Download Calico Goldmane proto file.
+	@echo "Downloading Goldmane proto file..."
+	mkdir -p internal/cniwatcher/calico/goldmane
+	curl -fsSL https://raw.githubusercontent.com/projectcalico/calico/$(GOLDMANE_VERSION)/goldmane/proto/api.proto -o internal/cniwatcher/calico/goldmane/api.proto
+
+.PHONY: generate-calico-goldmane-proto
+generate-calico-goldmane-proto: download-calico-goldmane-proto ## Generate Go code from Goldmane proto definitions.
+	@echo "Generating Go code from Goldmane proto definitions..."
+	protoc --go_out=. --go_opt=paths=source_relative \
+		--go-grpc_out=. --go-grpc_opt=paths=source_relative \
+		internal/cniwatcher/calico/goldmane/api.proto
+
+.PHONY: build-cniwatcher-image
+build-cniwatcher-image:
+	$(CONTAINER_TOOL) build -t cniwatcher:latest --build-arg CNIWATCHER_VERSION=$(CNIWATCHER_VERSION) -f package/Dockerfile.cniwatcher .

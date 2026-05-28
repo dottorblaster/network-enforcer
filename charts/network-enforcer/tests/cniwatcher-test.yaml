@@ -1,0 +1,19 @@
+suite: "CNI Watcher DaemonSet Tests"
+templates:
+  - "templates/cniwatcher/daemonset.yaml"
+
+tests:
+  - it: "should allow image, and imagePullPolicy to be overridden"
+    set:
+      cniwatcher:
+        image:
+          repository: somewhere/cniwatcher
+          tag: v9.9.9
+          pullPolicy: Always
+    asserts:
+      - equal:
+          path: "spec.template.spec.containers[0].image"
+          value: "somewhere/cniwatcher:v9.9.9"
+      - equal:
+          path: "spec.template.spec.containers[0].imagePullPolicy"
+          value: "Always" 

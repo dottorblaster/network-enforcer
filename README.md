@@ -1,6 +1,8 @@
 # network-enforcer
 // TODO(user): Add simple overview of use/purpose
 
+The **cniWatcher** DaemonSet is documented in [docs/cniwatcher.md](docs/cniwatcher.md).
+
 ## Description
 // TODO(user): An in-depth paragraph about your project and overview of use
 

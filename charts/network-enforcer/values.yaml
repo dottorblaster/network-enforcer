@@ -44,3 +44,32 @@ obi:
   config:
     create: false
     name: network-enforcer-obi-config
+
+cniwatcher:
+  # Valid values: aws-vpc, calico, cilium, flannel
+  cniType: calico
+  image:
+    repository: ghcr.io/rancher-sandbox/network-enforcer/cniwatcher
+    tag: v0.1.0
+    pullPolicy: IfNotPresent
+  resources:
+    limits:
+      cpu: 500m
+      memory: 128Mi
+    requests:
+      cpu: 10m
+      memory: 64Mi
+  # Empty string uses {{ release-name }}-otlp.{{ namespace }}.svc.cluster.local:4317
+  otelEndpoint: ""
+  calico:
+    namespace: calico-system
+    goldmaneEndpoint: goldmane.calico-system.svc:7443
+  cilium:
+    namespace: kube-system
+    hubbleEndpoint: unix:///var/run/cilium/hubble.sock
+  flannel:
+    namespace: kube-system
+  "aws-vpc":
+    namespace: kube-system
+  serviceAccount:
+    annotations: {}

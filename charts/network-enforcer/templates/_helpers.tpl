@@ -49,3 +49,104 @@ Selector labels
 app.kubernetes.io/name: {{ include "network-enforcer.name" . }}
 app.kubernetes.io/instance: {{ .Release.Name }}
 {{- end }}
+
+{{/*
+Set namespace based on CNI type
+*/}}
+{{- define "network-enforcer.cniwatcher.namespace" -}}
+{{- $cni := .Values.cniwatcher.cniType -}}
+{{- $cniConfig := index .Values.cniwatcher $cni | default dict -}}
+{{- default "kube-system" $cniConfig.namespace -}}
+{{- end }}
+
+{{/*
+Set Pod security context based on CNI type
+*/}}
+{{- define "network-enforcer.cniwatcher.podSecurityContext" -}}
+seccompProfile:
+  type: RuntimeDefault
+{{- $cni := .Values.cniwatcher.cniType }}
+{{- if eq $cni "aws-vpc" }}
+runAsNonRoot: false
+{{- else }}
+runAsNonRoot: true
+{{- end }}
+{{- if eq $cni "flannel" }}
+fsGroup: 4
+{{- end }}
+{{- end }}
+
+{{/*
+Set Container security context based on CNI type
+*/}}
+{{- define "network-enforcer.cniwatcher.containerSecurityContext" -}}
+allowPrivilegeEscalation: false
+readOnlyRootFilesystem: true
+capabilities:
+  drop:
+    - ALL
+{{- $cni := .Values.cniwatcher.cniType }}
+{{- if eq $cni "aws-vpc" }}
+runAsUser: 0
+{{- else }}
+runAsUser: 1000
+{{- end }}
+{{- end }}
+
+{{/*
+Set OTEL endpoint (defaults to controller OTLP service in release namespace)
+*/}}
+{{- define "network-enforcer.cniwatcher.otelEndpoint" -}}
+{{- if .Values.cniwatcher.otelEndpoint -}}
+{{- .Values.cniwatcher.otelEndpoint -}}
+{{- else -}}
+{{- printf "%s-otlp.%s.svc.cluster.local:4317" (include "network-enforcer.fullname" .) .Release.Namespace -}}
+{{- end -}}
+{{- end -}}
+
+{{/*
+CNI-specific volume mounts for cniwatcher
+*/}}
+{{- define "network-enforcer.cniwatcher.volumeMounts" -}}
+{{- if eq .Values.cniwatcher.cniType "cilium" }}
+- name: hubble-sock
+  mountPath: /var/run/cilium
+{{- else if eq .Values.cniwatcher.cniType "calico" }}
+- name: goldmane-key-pair-volume
+  mountPath: /etc/goldmane/certs
+  readOnly: true
+{{- else if eq .Values.cniwatcher.cniType "flannel" }}
+- name: flannel-ulog
+  mountPath: /var/log/ulog
+  readOnly: true
+{{- else if eq .Values.cniwatcher.cniType "aws-vpc" }}
+- name: aws-eni-logs
+  mountPath: /var/log/aws-routed-eni
+  readOnly: true
+{{- end }}
+{{- end -}}
+
+{{/*
+CNI-specific volumes for cniwatcher
+*/}}
+{{- define "network-enforcer.cniwatcher.volumes" -}}
+{{- if eq .Values.cniwatcher.cniType "cilium" }}
+- name: hubble-sock
+  hostPath:
+    path: /var/run/cilium
+{{- else if eq .Values.cniwatcher.cniType "calico" }}
+- name: goldmane-key-pair-volume
+  secret:
+    secretName: cniwatcher-goldmane-key-pair
+{{- else if eq .Values.cniwatcher.cniType "flannel" }}
+- name: flannel-ulog
+  hostPath:
+    path: /var/log/ulog
+    type: Directory
+{{- else if eq .Values.cniwatcher.cniType "aws-vpc" }}
+- name: aws-eni-logs
+  hostPath:
+    path: /var/log/aws-routed-eni
+    type: Directory
+{{- end }}
+{{- end -}}

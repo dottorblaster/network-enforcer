@@ -1,0 +1,59 @@
+apiVersion: apps/v1
+kind: DaemonSet
+metadata:
+  name: {{ include "network-enforcer.fullname" . }}-cniwatcher
+  namespace: {{ include "network-enforcer.cniwatcher.namespace" . }}
+  labels:
+    app.kubernetes.io/name: {{ include "network-enforcer.name" . }}-cniwatcher
+    app.kubernetes.io/part-of: {{ include "network-enforcer.name" . }}
+    {{- include "network-enforcer.labels" . | nindent 4 }}
+spec:
+  selector:
+    matchLabels:
+      app.kubernetes.io/name: {{ include "network-enforcer.name" . }}-cniwatcher
+      app.kubernetes.io/instance: {{ .Release.Name }}
+  template:
+    metadata:
+      labels:
+        app.kubernetes.io/name: {{ include "network-enforcer.name" . }}-cniwatcher
+        app.kubernetes.io/instance: {{ .Release.Name }}
+        app.kubernetes.io/part-of: {{ include "network-enforcer.name" . }}
+    spec:
+      serviceAccountName: {{ include "network-enforcer.fullname" . }}-cniwatcher
+      securityContext:
+        {{- include "network-enforcer.cniwatcher.podSecurityContext" . | nindent 8 }}
+      containers:
+        - name: cniwatcher
+          image: "{{ .Values.cniwatcher.image.repository }}:{{ .Values.cniwatcher.image.tag }}"
+          imagePullPolicy: {{ .Values.cniwatcher.image.pullPolicy }}
+          {{- $cni := .Values.cniwatcher.cniType }}
+          securityContext:
+            {{- include "network-enforcer.cniwatcher.containerSecurityContext" . | nindent 12 }}
+          env:
+            - name: NODE_NAME
+              valueFrom:
+                fieldRef:
+                  fieldPath: spec.nodeName
+            - name: OTEL_EXPORTER_OTLP_ENDPOINT
+              value: {{ include "network-enforcer.cniwatcher.otelEndpoint" . | quote }}
+            - name: CNIWATCHER_CNI_TYPE
+              value: {{ $cni | quote }}
+
+            {{- if eq $cni "calico" }}
+            - name: CNIWATCHER_GOLDMANE_ENDPOINT
+              value: {{ .Values.cniwatcher.calico.goldmaneEndpoint | default "goldmane.calico-system.svc:7443" | quote }}
+            {{- else if eq $cni "cilium" }}
+            - name: CNIWATCHER_HUBBLE_ENDPOINT
+              value: {{ .Values.cniwatcher.cilium.hubbleEndpoint | default "unix:///var/run/cilium/hubble.sock" | quote }}
+            {{- end }}
+
+          volumeMounts:
+            {{- include "network-enforcer.cniwatcher.volumeMounts" . | nindent 12 }}
+            {{- if .Values.cniwatcher.volumeMounts }}
+            {{- toYaml .Values.cniwatcher.volumeMounts | nindent 12 }}
+            {{- end }}
+      volumes:
+        {{- include "network-enforcer.cniwatcher.volumes" . | nindent 8 }}
+        {{- if .Values.cniwatcher.volumes }}
+        {{- toYaml .Values.cniwatcher.volumes | nindent 8 }}
+        {{- end }}

@@ -1,0 +1,12 @@
+FROM registry.suse.com/bci/golang:1.26 AS builder
+ARG CNIWATCHER_VERSION
+WORKDIR /src
+COPY . .
+RUN make cniwatcher CNIWATCHER_VERSION=${CNIWATCHER_VERSION}
+
+FROM scratch
+WORKDIR /
+COPY --from=builder /src/bin/cniwatcher /cniwatcher
+
+USER 65532:65532
+ENTRYPOINT ["/cniwatcher"]
