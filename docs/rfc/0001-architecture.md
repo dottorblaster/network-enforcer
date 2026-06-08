@@ -3,7 +3,7 @@
 | Feature Name | Network enforcer architecture |
 | Start Date   | 2026-05-29                 |
 | Category     | Architecture               |
-| RFC PR       | [fill this in after opening PR] |
+| RFC PR       | https://github.com/rancher-sandbox/network-enforcer/pull/9 |
 | State        | **ACCEPTED**               |
 
 # Summary
