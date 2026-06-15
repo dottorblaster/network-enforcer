@@ -459,7 +459,6 @@ linters:
       # todo!: disable linters on CNI watcher and tests for now
       - '^internal/cniwatcher/.*\.go$'
       - '^cmd/cniwatcher/.*\.go$'
-      - '^internal/.*_test\.go$'
       - '^hack/.*\.go$'
     rules:
       - source: 'TODO'
