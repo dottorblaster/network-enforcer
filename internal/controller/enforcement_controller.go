@@ -18,7 +18,10 @@ package controller
 
 import (
 	"context"
+	"errors"
 
+	networkingv1 "k8s.io/api/networking/v1"
+	apierrors "k8s.io/apimachinery/pkg/api/errors"
 	"k8s.io/apimachinery/pkg/runtime"
 	ctrl "sigs.k8s.io/controller-runtime"
 	"sigs.k8s.io/controller-runtime/pkg/client"
@@ -56,9 +59,29 @@ func (r *EnforcementReconciler) Reconcile(ctx context.Context, req ctrl.Request)
 	if !enforced {
 		return ctrl.Result{}, nil
 	}
-	// todo!: we need to convert the proposal to a real policy
-	log.Info("[still to implement] enforce policy", "name", proposal.Name, "namespace", proposal.Namespace)
 
+	policy, ok := r.Backend.Build(&proposal).(*networkingv1.NetworkPolicy)
+	if !ok {
+		return ctrl.Result{}, errors.New("failed to build network policy")
+	}
+
+	// Try to get the resource
+	err := r.Get(ctx, client.ObjectKeyFromObject(policy), policy)
+	if err == nil {
+		// Policy already exists, do nothing.
+		return ctrl.Result{}, nil
+	}
+
+	if !apierrors.IsNotFound(err) {
+		// generic error, we return it.
+		return ctrl.Result{}, err
+	}
+
+	// Policy does not exist, we need to create it
+	if err = r.Create(ctx, policy); err != nil {
+		return ctrl.Result{}, err
+	}
+	log.Info("created policy", "backend", r.Backend.Name(), "name", policy.Name, "namespace", policy.Namespace)
 	return ctrl.Result{}, nil
 }
 

@@ -19,28 +19,12 @@ func (b *Backend) Empty() client.Object {
 	return &networkingv1.NetworkPolicy{}
 }
 
-func (b *Backend) Build(
-	name, namespace string,
-	podSelector map[string]string,
-	proposal *securityv1alpha1.NetworkPolicyProposal,
-) client.Object {
-	policy := &networkingv1.NetworkPolicy{
+func (b *Backend) Build(proposal *securityv1alpha1.NetworkPolicyProposal) client.Object {
+	return &networkingv1.NetworkPolicy{
 		ObjectMeta: metav1.ObjectMeta{
-			Name:      name,
-			Namespace: namespace,
+			Name:      proposal.Name,
+			Namespace: proposal.Namespace,
 		},
-		Spec: networkingv1.NetworkPolicySpec{
-			PodSelector: proposal.Spec.PodSelector,
-			PolicyTypes: proposal.Spec.PolicyTypes,
-		},
+		Spec: proposal.Spec,
 	}
-
-	if len(policy.Spec.PodSelector.MatchLabels) == 0 {
-		policy.Spec.PodSelector = metav1.LabelSelector{MatchLabels: podSelector}
-	}
-
-	policy.Spec.Ingress = append(policy.Spec.Ingress, proposal.Spec.Ingress...)
-	policy.Spec.Egress = append(policy.Spec.Egress, proposal.Spec.Egress...)
-
-	return policy
 }
