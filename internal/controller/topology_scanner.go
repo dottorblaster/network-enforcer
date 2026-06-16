@@ -20,6 +20,10 @@ import (
 	"secuity.rancher.io/network-enforcer/internal/topology"
 )
 
+const (
+	namespaceLabelKey = "kubernetes.io/metadata.name"
+)
+
 type TopologyScanner struct {
 	client   client.Client
 	store    *topology.Store
@@ -178,29 +182,75 @@ func (ts *TopologyScanner) reconcileProposal(
 	return nil
 }
 
-func findEgressPeer(
-	newRule networkingv1.NetworkPolicyEgressRule,
-	existing []networkingv1.NetworkPolicyEgressRule,
-) bool {
-	for _, peer := range existing {
-		// todo!: this should be fixed, the order of the internal slices could be different
-		if reflect.DeepEqual(peer, newRule) {
+func containsRule[T any](newRule T, existing []T, equalFn func(T, T) bool) bool {
+	for _, rule := range existing {
+		if equalFn(newRule, rule) {
 			return true
 		}
 	}
 	return false
 }
 
-func findIngressPeer(
-	newRule networkingv1.NetworkPolicyIngressRule,
-	existing []networkingv1.NetworkPolicyIngressRule,
-) bool {
-	for _, peer := range existing {
-		if reflect.DeepEqual(peer, newRule) {
-			return true
+func selectorEqual(a, b *metav1.LabelSelector) bool {
+	return metav1.FormatLabelSelector(a) == metav1.FormatLabelSelector(b)
+}
+
+func ipBlockEqual(a, b *networkingv1.IPBlock) bool {
+	if a == nil || b == nil {
+		return a == b
+	}
+	if a.CIDR != b.CIDR {
+		return false
+	}
+	return equalUnordered(a.Except, b.Except, func(left, right string) bool {
+		return left == right
+	})
+}
+
+func policyPeerEqual(a, b networkingv1.NetworkPolicyPeer) bool {
+	return selectorEqual(a.NamespaceSelector, b.NamespaceSelector) &&
+		selectorEqual(a.PodSelector, b.PodSelector) &&
+		ipBlockEqual(a.IPBlock, b.IPBlock)
+}
+
+func policyPortEqual(a, b networkingv1.NetworkPolicyPort) bool {
+	return reflect.DeepEqual(a, b)
+}
+
+func equalUnordered[T any](left, right []T, equalFn func(T, T) bool) bool {
+	if len(left) != len(right) {
+		return false
+	}
+
+	used := make([]bool, len(right))
+	for _, leftItem := range left {
+		matched := false
+		for i, rightItem := range right {
+			if used[i] {
+				continue
+			}
+			if equalFn(leftItem, rightItem) {
+				used[i] = true
+				matched = true
+				break
+			}
+		}
+		if !matched {
+			return false
 		}
 	}
-	return false
+
+	return true
+}
+
+func egressRuleEqual(a, b networkingv1.NetworkPolicyEgressRule) bool {
+	return equalUnordered(a.To, b.To, policyPeerEqual) &&
+		equalUnordered(a.Ports, b.Ports, policyPortEqual)
+}
+
+func ingressRuleEqual(a, b networkingv1.NetworkPolicyIngressRule) bool {
+	return equalUnordered(a.From, b.From, policyPeerEqual) &&
+		equalUnordered(a.Ports, b.Ports, policyPortEqual)
 }
 
 func (ts *TopologyScanner) buildSpec(
@@ -216,7 +266,7 @@ func (ts *TopologyScanner) buildSpec(
 			return err
 		}
 		for _, rule := range deltaRules {
-			if findEgressPeer(rule, spec.Egress) {
+			if containsRule(rule, spec.Egress, egressRuleEqual) {
 				continue
 			}
 			spec.Egress = append(spec.Egress, rule)
@@ -228,7 +278,7 @@ func (ts *TopologyScanner) buildSpec(
 		}
 
 		for _, rule := range deltaRules {
-			if findIngressPeer(rule, spec.Ingress) {
+			if containsRule(rule, spec.Ingress, ingressRuleEqual) {
 				continue
 			}
 			spec.Ingress = append(spec.Ingress, rule)
@@ -248,25 +298,14 @@ func (ts *TopologyScanner) buildEgressRules(
 
 	rules := make([]networkingv1.NetworkPolicyEgressRule, 0, len(peerList))
 	for _, peer := range peerList {
-		peerSelector, err := selectorFromWorkloadKey(ctx, ts.client, peer.WorkloadKey)
+		policyPeer, policyPort, err := ts.buildPeerRuleParts(ctx, peer)
 		if err != nil {
 			return nil, fmt.Errorf("resolving egress peer selector: %w", err)
 		}
 
-		port := intstr.FromInt32(peer.DstPort)
 		rules = append(rules, networkingv1.NetworkPolicyEgressRule{
-			To: []networkingv1.NetworkPolicyPeer{{
-				NamespaceSelector: &metav1.LabelSelector{
-					MatchLabels: map[string]string{
-						"kubernetes.io/metadata.name": peer.Namespace,
-					},
-				},
-				PodSelector: &peerSelector,
-			}},
-			Ports: []networkingv1.NetworkPolicyPort{{
-				Protocol: &peer.Protocol,
-				Port:     &port,
-			}},
+			To:    []networkingv1.NetworkPolicyPeer{policyPeer},
+			Ports: []networkingv1.NetworkPolicyPort{policyPort},
 		})
 	}
 
@@ -281,27 +320,43 @@ func (ts *TopologyScanner) buildIngressRules(
 
 	rules := make([]networkingv1.NetworkPolicyIngressRule, 0, len(peerList))
 	for _, peer := range peerList {
-		peerSelector, err := selectorFromWorkloadKey(ctx, ts.client, peer.WorkloadKey)
+		policyPeer, policyPort, err := ts.buildPeerRuleParts(ctx, peer)
 		if err != nil {
 			return nil, fmt.Errorf("resolving ingress peer selector: %w", err)
 		}
 
-		port := intstr.FromInt32(peer.DstPort)
 		rules = append(rules, networkingv1.NetworkPolicyIngressRule{
-			From: []networkingv1.NetworkPolicyPeer{{
-				NamespaceSelector: &metav1.LabelSelector{
-					MatchLabels: map[string]string{
-						"kubernetes.io/metadata.name": peer.Namespace,
-					},
-				},
-				PodSelector: &peerSelector,
-			}},
-			Ports: []networkingv1.NetworkPolicyPort{{
-				Protocol: &peer.Protocol,
-				Port:     &port,
-			}},
+			From:  []networkingv1.NetworkPolicyPeer{policyPeer},
+			Ports: []networkingv1.NetworkPolicyPort{policyPort},
 		})
 	}
 
 	return rules, nil
+}
+
+func (ts *TopologyScanner) buildPeerRuleParts(
+	ctx context.Context,
+	peer topology.Peer,
+) (networkingv1.NetworkPolicyPeer, networkingv1.NetworkPolicyPort, error) {
+	peerSelector, err := selectorFromWorkloadKey(ctx, ts.client, peer.WorkloadKey)
+	if err != nil {
+		return networkingv1.NetworkPolicyPeer{}, networkingv1.NetworkPolicyPort{}, err
+	}
+
+	port := intstr.FromInt32(peer.DstPort)
+
+	policyPeer := networkingv1.NetworkPolicyPeer{
+		NamespaceSelector: &metav1.LabelSelector{
+			MatchLabels: map[string]string{
+				namespaceLabelKey: peer.Namespace,
+			},
+		},
+		PodSelector: &peerSelector,
+	}
+	policyPort := networkingv1.NetworkPolicyPort{
+		Protocol: &peer.Protocol,
+		Port:     &port,
+	}
+
+	return policyPeer, policyPort, nil
 }
