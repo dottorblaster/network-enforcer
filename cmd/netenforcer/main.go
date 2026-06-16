@@ -22,6 +22,7 @@ import (
 	"fmt"
 	"log/slog"
 	"os"
+	"time"
 
 	"sigs.k8s.io/controller-runtime/pkg/manager"
 
@@ -44,6 +45,8 @@ import (
 	// +kubebuilder:scaffold:imports
 )
 
+const defaultDrainFlowsInterval = 30 * time.Second
+
 type config struct {
 	metricsAddr          string
 	metricsCertPath      string
@@ -54,6 +57,7 @@ type config struct {
 	secureMetrics        bool
 	enableHTTP2          bool
 	otlpPort             int
+	drainFlowsInterval   time.Duration
 	tlsOpts              []func(*tls.Config)
 }
 
@@ -114,7 +118,7 @@ func run(logger *slog.Logger, conf *config) error {
 		return fmt.Errorf("unable to add OTLP receiver to manager: %w", err)
 	}
 
-	scanner := controller.NewTopologyScanner(mgr.GetClient(), store, logger)
+	scanner := controller.NewTopologyScanner(mgr.GetClient(), store, logger, conf.drainFlowsInterval)
 	err = mgr.Add(scanner)
 	if err != nil {
 		return fmt.Errorf("unable to add topology scanner to manager: %w", err)
@@ -164,6 +168,8 @@ func main() {
 	flag.BoolVar(&conf.enableHTTP2, "enable-http2", false,
 		"If set, HTTP/2 will be enabled for the metrics server")
 	flag.IntVar(&conf.otlpPort, "otlp-port", 4317, "The port the OTLP gRPC receiver listens on.")
+	flag.DurationVar(&conf.drainFlowsInterval, "drain-flows-interval",
+		defaultDrainFlowsInterval, "The interval at which flows are drained.")
 	flag.Parse()
 
 	slogHandler := slog.NewJSONHandler(os.Stdout, &slog.HandlerOptions{Level: slog.LevelInfo})

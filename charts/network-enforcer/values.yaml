@@ -33,6 +33,7 @@ controller:
   podAnnotations: {}
   nodeSelector: {}
   affinity: {}
+  drainFlowsInterval: 30s
 
 kubernetesClusterDomain: cluster.local
 imagePullSecrets: []
