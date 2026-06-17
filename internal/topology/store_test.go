@@ -4,14 +4,16 @@ import (
 	"testing"
 
 	corev1 "k8s.io/api/core/v1"
+
+	"secuity.rancher.io/network-enforcer/internal/ownerkind"
 )
 
 func TestStore_Record_DeduplicatesSameFlow(t *testing.T) {
 	s := NewStore()
 
 	f := &FlowRecord{
-		Source:   WorkloadKey{Namespace: "default", OwnerKind: "Deployment", OwnerName: "frontend"},
-		Dest:     WorkloadKey{Namespace: "default", OwnerKind: "Deployment", OwnerName: "backend"},
+		Source:   WorkloadKey{Namespace: "default", OwnerKind: ownerkind.KindDeployment, OwnerName: "frontend"},
+		Dest:     WorkloadKey{Namespace: "default", OwnerKind: ownerkind.KindDeployment, OwnerName: "backend"},
 		DstPort:  8080,
 		Protocol: corev1.ProtocolTCP,
 	}
@@ -40,8 +42,8 @@ func TestStore_Record_DeduplicatesSameFlow(t *testing.T) {
 func TestStore_DrainFlows_ReturnsRecordedFlow(t *testing.T) {
 	s := NewStore()
 	s.Record(&FlowRecord{
-		Source:   WorkloadKey{Namespace: "demo", OwnerKind: "Deployment", OwnerName: "frontend"},
-		Dest:     WorkloadKey{Namespace: "demo", OwnerKind: "Deployment", OwnerName: "backend"},
+		Source:   WorkloadKey{Namespace: "demo", OwnerKind: ownerkind.KindDeployment, OwnerName: "frontend"},
+		Dest:     WorkloadKey{Namespace: "demo", OwnerKind: ownerkind.KindDeployment, OwnerName: "backend"},
 		DstPort:  8080,
 		Protocol: corev1.ProtocolTCP,
 	})
@@ -58,8 +60,8 @@ func TestStore_DrainFlows_ReturnsRecordedFlow(t *testing.T) {
 func TestStore_DrainFlows_DrainsStore(t *testing.T) {
 	s := NewStore()
 	s.Record(&FlowRecord{
-		Source:   WorkloadKey{Namespace: "demo", OwnerKind: "Deployment", OwnerName: "frontend"},
-		Dest:     WorkloadKey{Namespace: "demo", OwnerKind: "Deployment", OwnerName: "backend"},
+		Source:   WorkloadKey{Namespace: "demo", OwnerKind: ownerkind.KindDeployment, OwnerName: "frontend"},
+		Dest:     WorkloadKey{Namespace: "demo", OwnerKind: ownerkind.KindDeployment, OwnerName: "backend"},
 		DstPort:  8080,
 		Protocol: corev1.ProtocolTCP,
 	})

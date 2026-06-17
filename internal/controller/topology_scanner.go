@@ -69,7 +69,7 @@ func getProposalMetadata(
 		ObjectMeta: metav1.ObjectMeta{
 			Name: fmt.Sprintf(
 				"%s-%s-%s",
-				strings.ToLower(workload.OwnerKind),
+				strings.ToLower(string(workload.OwnerKind)),
 				workload.OwnerName,
 				strings.ToLower(string(direction)),
 			),

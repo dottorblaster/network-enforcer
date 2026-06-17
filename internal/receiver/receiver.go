@@ -14,6 +14,7 @@ import (
 	"google.golang.org/grpc"
 	corev1 "k8s.io/api/core/v1"
 
+	"secuity.rancher.io/network-enforcer/internal/ownerkind"
 	"secuity.rancher.io/network-enforcer/internal/topology"
 )
 
@@ -136,9 +137,9 @@ func (r *Receiver) generateFlow(attrs map[string]string) *topology.FlowRecord {
 		return nil
 	}
 
-	dstKind := attrs["k8s.dst.owner.type"]
+	dstKindRaw := attrs["k8s.dst.owner.type"]
 	// todo!: we need to generate the policy here because the service port could be different from the pod destination one. at the moment we ignore this case.
-	if dstKind == "Service" {
+	if dstKindRaw == string(ownerkind.KindService) {
 		return nil
 	}
 
@@ -146,7 +147,7 @@ func (r *Receiver) generateFlow(attrs map[string]string) *topology.FlowRecord {
 	// srcPodIP -> dstPodIP (seen from src pod egress)
 	// srcPodIP -> dstPodIP (seen from dst pod ingress)
 	// we should end up with the same flow key in the table so it should be deduplicated by default.
-	srcKind := attrs["k8s.src.owner.type"]
+	srcKindRaw := attrs["k8s.src.owner.type"]
 	srcNs := attrs["k8s.src.namespace"]
 	srcName := attrs["k8s.src.owner.name"]
 	dstNs := attrs["k8s.dst.namespace"]
@@ -158,8 +159,18 @@ func (r *Receiver) generateFlow(attrs map[string]string) *topology.FlowRecord {
 	// todo!: It is not super clear why some flows don't have the workload information, for now we ignore them.
 	// This is an example
 	// 2026-06-11T14:49:30Z  INFO  flowcollector skipping datapoint: missing required fields {"attrs": {"client.port":"60360","direction":"request","dst.address":"10.0.0.2","dst.name":"opentelemetry-collector-59ccbf7448-5r4bv","dst.port":"13133","iface.direction":"egress","k8s.dst.name":"opentelemetry-collector-59ccbf7448-5r4bv","k8s.dst.namespace":"network-enforcer","k8s.dst.node.ip":"172.18.0.2","k8s.dst.node.name":"kind-control-plane","k8s.dst.owner.name":"opentelemetry-collector","k8s.dst.owner.type":"Deployment","k8s.dst.type":"Pod","network.protocol.name":"undefined","network.type":"ipv4","obi.ip":"172.18.0.2","server.port":"13133","src.address":"10.0.0.77","src.name":"10.0.0.77","src.port":"60360","transport":"TCP"}}
-	if srcKind == "" || srcNs == "" || srcName == "" || dstNs == "" || dstName == "" {
+	if srcKindRaw == "" || srcNs == "" || srcName == "" ||
+		dstKindRaw == "" || dstNs == "" || dstName == "" {
 		r.log.Debug("skipping datapoint: missing required fields", "attrs", attrs)
+		return nil
+	}
+
+	srcKind, srcSupported := ownerkind.IsValidEndpoint(srcKindRaw)
+	dstKind, dstSupported := ownerkind.IsValidEndpoint(dstKindRaw)
+	if !srcSupported || !dstSupported {
+		r.log.Debug("skipping datapoint: unsupported workload kind",
+			"srcKind", srcKindRaw,
+			"dstKind", dstKindRaw)
 		return nil
 	}
 

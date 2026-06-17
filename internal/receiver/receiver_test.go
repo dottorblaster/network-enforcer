@@ -8,6 +8,7 @@ import (
 	"github.com/stretchr/testify/require"
 	corev1 "k8s.io/api/core/v1"
 
+	"secuity.rancher.io/network-enforcer/internal/ownerkind"
 	"secuity.rancher.io/network-enforcer/internal/topology"
 )
 
@@ -31,8 +32,8 @@ func TestReceiverGenerateFlow(t *testing.T) {
 	t.Parallel()
 	attrs := map[string]string{
 		"iface.direction":    "egress",
-		"k8s.dst.owner.type": "Deployment",
-		"k8s.src.owner.type": "Deployment",
+		"k8s.dst.owner.type": string(ownerkind.KindDeployment),
+		"k8s.src.owner.type": string(ownerkind.KindDeployment),
 		"k8s.dst.owner.name": "server",
 		"k8s.src.owner.name": "client",
 		"k8s.src.namespace":  "default",
@@ -59,12 +60,17 @@ func TestReceiverGenerateFlow(t *testing.T) {
 		},
 		{
 			name:  "DropsServiceDestination",
-			attrs: mutateAttrs(attrs, "k8s.dst.owner.type", "Service"),
+			attrs: mutateAttrs(attrs, "k8s.dst.owner.type", string(ownerkind.KindService)),
 			flow:  nil,
 		},
 		{
 			name:  "MissingSrcInfo",
 			attrs: mutateAttrs(attrs, "k8s.src.owner.name", ""),
+			flow:  nil,
+		},
+		{
+			name:  "UnsupportedDstKind",
+			attrs: mutateAttrs(attrs, "k8s.dst.owner.type", string(ownerkind.KindCronJob)),
 			flow:  nil,
 		},
 		{
@@ -84,12 +90,12 @@ func TestReceiverGenerateFlow(t *testing.T) {
 				Source: topology.WorkloadKey{
 					Namespace: "default",
 					OwnerName: "client",
-					OwnerKind: "Deployment",
+					OwnerKind: ownerkind.KindDeployment,
 				},
 				Dest: topology.WorkloadKey{
 					Namespace: "default",
 					OwnerName: "server",
-					OwnerKind: "Deployment",
+					OwnerKind: ownerkind.KindDeployment,
 				},
 				DstAddress: "",
 				SrcAddress: "",

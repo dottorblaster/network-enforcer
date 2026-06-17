@@ -4,11 +4,13 @@ import (
 	"k8s.io/apimachinery/pkg/util/sets"
 
 	corev1 "k8s.io/api/core/v1"
+
+	"secuity.rancher.io/network-enforcer/internal/ownerkind"
 )
 
 type WorkloadKey struct {
 	Namespace string
-	OwnerKind string
+	OwnerKind ownerkind.Kind
 	OwnerName string
 }
 
