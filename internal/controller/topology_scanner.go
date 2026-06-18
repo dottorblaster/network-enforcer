@@ -79,6 +79,9 @@ func getProposalMetadata(
 }
 
 func (ts *TopologyScanner) scan(ctx context.Context) {
+	// todo!: it would be nice to drain only connections that are correctly reconciled.
+	// at the moment we just log a warning and we drop the connection.
+	// we should implement some strategies to handle this more gracefully.
 	connections := ts.store.DrainFlows()
 	ts.log.InfoContext(
 		ctx,
