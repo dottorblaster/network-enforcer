@@ -42,8 +42,8 @@ type EnforcementReconciler struct {
 	Backend backend.PolicyBackend
 }
 
-// +kubebuilder:rbac:groups=security.security.rancher.io,resources=networkpolicyproposals,verbs=get;list;watch;update;patch
-// +kubebuilder:rbac:groups=security.security.rancher.io,resources=networkpolicyproposals/status,verbs=get;update;patch
+// +kubebuilder:rbac:groups=security.rancher.io,resources=networkpolicyproposals,verbs=get;list;watch;update;patch
+// +kubebuilder:rbac:groups=security.rancher.io,resources=networkpolicyproposals/status,verbs=get;update;patch
 // +kubebuilder:rbac:groups=apps,resources=deployments;statefulsets;daemonsets,verbs=get;list;watch
 
 func (r *EnforcementReconciler) Reconcile(ctx context.Context, req ctrl.Request) (ctrl.Result, error) {

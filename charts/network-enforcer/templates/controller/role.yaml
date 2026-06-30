@@ -28,7 +28,7 @@ rules:
   - update
   - watch
 - apiGroups:
-  - security.security.rancher.io
+  - security.rancher.io
   resources:
   - networkpolicyproposals
   verbs:
@@ -40,13 +40,13 @@ rules:
   - update
   - watch
 - apiGroups:
-  - security.security.rancher.io
+  - security.rancher.io
   resources:
   - networkpolicyproposals/finalizers
   verbs:
   - update
 - apiGroups:
-  - security.security.rancher.io
+  - security.rancher.io
   resources:
   - networkpolicyproposals/status
   verbs:

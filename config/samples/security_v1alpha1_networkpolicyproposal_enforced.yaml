@@ -1,4 +1,4 @@
-apiVersion: security.security.rancher.io/v1alpha1
+apiVersion: security.rancher.io/v1alpha1
 kind: NetworkPolicyProposal
 metadata:
   labels:

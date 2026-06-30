@@ -251,10 +251,10 @@ The enforcement boundary. See the next section.
 ## CRD surface
 
 One CRD: `NetworkPolicyProposal` (`npp`), namespaced, group
-`security.security.rancher.io`, version `v1alpha1`.
+`security.rancher.io`, version `v1alpha1`.
 
 ```yaml
-apiVersion: security.security.rancher.io/v1alpha1
+apiVersion: security.rancher.io/v1alpha1
 kind: NetworkPolicyProposal
 metadata:
   name: deployment-checkout
