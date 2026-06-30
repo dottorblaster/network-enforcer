@@ -9,9 +9,7 @@ api/<version>/*_types.go       CRD schemas (+kubebuilder markers)
 api/<version>/zz_generated.*   Auto-generated (DO NOT EDIT)
 internal/controller/*          Reconciliation logic
 internal/webhook/*             Validation/defaulting (if present)
-config/crd/bases/*             Generated CRDs (DO NOT EDIT)
-config/rbac/role.yaml          Generated RBAC (DO NOT EDIT)
-config/samples/*               Example CRs (edit these)
+charts/network-enforcer/*      Helm chart (deployment manifests)
 Makefile                       Build/test/deploy commands
 PROJECT                        Kubebuilder metadata Auto-generated (DO NOT EDIT)
 ```
@@ -37,9 +35,6 @@ Multi-group layout organizes APIs by group name (e.g., `batch`, `apps`). Check t
 ## Critical Rules
 
 ### Never Edit These (Auto-Generated)
-- `config/crd/bases/*.yaml` - from `make manifests`
-- `config/rbac/role.yaml` - from `make manifests`
-- `config/webhook/manifests.yaml` - from `make manifests`
 - `**/zz_generated.*.go` - from `make generate`
 - `PROJECT` - from `kubebuilder [OPTIONS]`
 
@@ -60,7 +55,6 @@ Ensure you run them against a dedicated [Kind](https://kind.sigs.k8s.io/) cluste
 
 **After editing `*_types.go` or markers:**
 ```
-make manifests  # Regenerate CRDs/RBAC from markers
 make generate   # Regenerate DeepCopy methods
 ```
 
@@ -153,18 +147,21 @@ Tests use **Ginkgo + Gomega** (BDD style). Check `suite_test.go` for setup.
 ## Deployment Workflow
 
 ```bash
-# 1. Regenerate manifests
-make manifests generate
-
-# 2. Build & deploy
+# 1. Build & deploy
 export IMG=<registry>/<project>:tag
 make docker-build docker-push IMG=$IMG  # Or: kind load docker-image $IMG --name <cluster>
-make deploy IMG=$IMG
+helm dependency update charts/network-enforcer
+helm upgrade --install network-enforcer charts/network-enforcer \
+  --namespace network-enforcer-system --create-namespace \
+  --set controller.image.repository=<registry>/<project>/controller \
+  --set controller.image.tag=<tag> \
+  --set cniwatcher.image.repository=<registry>/<project>/cniwatcher \
+  --set cniwatcher.image.tag=<tag>
 
-# 3. Test
-kubectl apply -k config/samples/
+# 2. Test
+kubectl apply -f <your-networkpolicyproposal.yaml>
 
-# 4. Debug
+# 3. Debug
 kubectl logs -n <project>-system deployment/<project>-controller-manager -c manager -f
 ```
 
@@ -250,24 +247,7 @@ Generated code includes: status conditions (`metav1.Condition`), finalizers, own
 
 ## Distribution Options
 
-### Option 1: YAML Bundle (Kustomize)
-
-```bash
-# Generate dist/install.yaml from Kustomize manifests
-make build-installer IMG=<registry>/<project>:tag
-```
-
-**Key points:**
-- The `dist/install.yaml` is generated from Kustomize manifests (CRDs, RBAC, Deployment)
-- Commit this file to your repository for easy distribution
-- Users only need `kubectl` to install (no additional tools required)
-
-**Example:** Users install with a single command:
-```bash
-kubectl apply -f https://raw.githubusercontent.com/<org>/<repo>/<tag>/dist/install.yaml
-```
-
-### Option 2: Helm Chart
+### Helm Chart
 
 ```bash
 kubebuilder edit --plugins=helm/v2-alpha                      # Generates dist/chart/ (default)
