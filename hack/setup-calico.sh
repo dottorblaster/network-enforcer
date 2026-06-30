@@ -2,28 +2,35 @@
 
 set -eu
 
-CALICO_VERSION="v3.32.0"
-BASE_URL="https://raw.githubusercontent.com/projectcalico/calico/${CALICO_VERSION}/manifests"
+CALICO_VERSION="v3.32.1"
 
-# Taken from the official documentation https://docs.tigera.io/calico/latest/getting-started/kubernetes/kind#install-calico
-#
-# Create the Custom Resource Definitions (CRDs)
-kubectl apply --server-side --force-conflicts -f "${BASE_URL}/operator-crds.yaml"
-# Deploy the Tigera Operator that will reconcile the CRs
-kubectl apply -f "${BASE_URL}/tigera-operator.yaml"
-kubectl wait --for=condition=Available deployment/tigera-operator -n tigera-operator --timeout=300s
+helm repo add projectcalico https://docs.tigera.io/calico/charts
+helm repo update
 
-# This deploys the Goldmane deployment from which we will read flow logs
-echo "\n-Deploy goldmane:\n"
-kubectl apply -f "${BASE_URL}/custom-resources.yaml"
+# Install the CRD first
+printf "\n- 🚀 Install Calico CRDs:\n"
+helm template calico-crds projectcalico/crd.projectcalico.org.v1 --version $CALICO_VERSION | kubectl apply --server-side -f -
+
+printf "\n- 🚀 Deploy tigera-operator:\n"
+helm upgrade --install calico projectcalico/tigera-operator \
+  --version $CALICO_VERSION \
+  --namespace tigera-operator \
+  --create-namespace \
+  --wait --timeout 10m \
+  --set installation.enabled=true \
+  --set apiServer.enabled=true \
+  --set goldmane.enabled=true \
+  --set whisker.enabled=true \
+  --set 'installation.calicoNetwork.ipPools[0].name=default-ipv4-ippool' \
+  --set 'installation.calicoNetwork.ipPools[0].cidr=10.244.0.0/16' # `10.244.0.0/16` is the default Kind Cluster CIDR
 
 # Wait for the Goldmane certificates to be created
-echo "\n-Wait for goldmane resources to be created:\n"
+printf "\n- 🚀 Wait for goldmane resources to be created:\n"
 kubectl wait --for=create -n calico-system configmap/goldmane-ca-bundle --timeout=120s
 kubectl wait --for=create -n calico-system secret/goldmane-key-pair --timeout=120s
 
 # Create the secret for the CNI watcher
-echo "\n-Creating CNI watcher secret:\n"
+printf "\n- 🚀 Creating CNI watcher secret:\n"
 kubectl create secret generic cniwatcher-goldmane-key-pair \
   --from-file=ca.crt=<(kubectl -n calico-system get configmap goldmane-ca-bundle -o jsonpath='{.data.tigera-ca-bundle\.crt}') \
   --from-file=tls.crt=<(kubectl -n calico-system get secret goldmane-key-pair -o jsonpath='{.data.tls\.crt}' | base64 -d) \
