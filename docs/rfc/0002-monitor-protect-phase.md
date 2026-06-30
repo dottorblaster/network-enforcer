@@ -3,7 +3,7 @@
 | Feature Name | Monitor/Protect policy lifecycle                                |
 | Start Date   | 2026-06-26                                                      |
 | Category     | Architecture                                                    |
-| RFC PR       | [fill this in after opening PR]                                 |
+| RFC PR       | https://github.com/rancher-sandbox/network-enforcer/pull/40     |
 | State        | **ACCEPTED**                                                    |
 
 # Summary
@@ -15,7 +15,7 @@ The design defines two CRDs:
 - `WorkloadNetworkPolicyProposal`: the learning output (observed intent). This is the current proposal renamed from `NetworkPolicyProposal` to `WorkloadNetworkPolicyProposal`
 - `WorkloadNetworkPolicy`: the runtime policy with `spec.mode`
 
-Promotion from proposal to policy is explicit. The monitor phase is implemented initially by reusing learning flows in a best-effort way.
+Promotion from proposal to policy is explicit. The monitor phase is implemented initially by reusing learning flows in a best-effort way. This means that the monitor phase is not enforced by the underlying CNI and may not catch all violations.
 
 # Motivation
 
@@ -74,7 +74,7 @@ New runtime policy CR.
 Example:
 
 ```yaml
-apiVersion: security.security.rancher.io/v1alpha1
+apiVersion: security.rancher.io/v1alpha1
 kind: WorkloadNetworkPolicy
 metadata:
   name: deployment-nginx-egress
@@ -135,7 +135,7 @@ For each workload + direction:
 2. If policy exists and `mode=monitor`:
    - evaluate new flows against `spec.policy`
    - emit monitor violation when a flow would be denied. It could be an otel log.
-   - do not create/update proposal
+   - do not create a new proposal. When a policy exists the proposal should be already deleted and should not be recreated.
 3. If policy exists and `mode=protect`:
    - do nothing. The cni-watcher will report violations.
 4. If no policy exists:
