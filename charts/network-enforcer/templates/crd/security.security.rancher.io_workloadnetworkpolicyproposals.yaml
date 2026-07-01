@@ -4,16 +4,16 @@ kind: CustomResourceDefinition
 metadata:
   annotations:
     controller-gen.kubebuilder.io/version: v0.20.1
-  name: networkpolicyproposals.security.rancher.io
+  name: workloadnetworkpolicyproposals.security.rancher.io
 spec:
   group: security.rancher.io
   names:
-    kind: NetworkPolicyProposal
-    listKind: NetworkPolicyProposalList
-    plural: networkpolicyproposals
+    kind: WorkloadNetworkPolicyProposal
+    listKind: WorkloadNetworkPolicyProposalList
+    plural: workloadnetworkpolicyproposals
     shortNames:
-    - npp
-    singular: networkpolicyproposal
+    - wnpp
+    singular: workloadnetworkpolicyproposal
   scope: Namespaced
   versions:
   - additionalPrinterColumns:

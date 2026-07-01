@@ -1,7 +1,7 @@
 # Demo: network-enforcer feedback loop
 
 This sets up a minimal scenario where you can watch the network-enforcer
-create and populate `NetworkPolicyProposal` resources from real traffic.
+create and populate `WorkloadNetworkPolicyProposal` resources from real traffic.
 
 ## Prerequisites
 
@@ -46,13 +46,13 @@ This creates three deployments in the `demo` namespace:
 
 ```bash
 # Wait ~30-60s for OBI to pick up flows and the controller to reconcile
-kubectl get networkpolicyproposals -n demo -w
+kubectl get workloadnetworkpolicyproposals -n demo -w
 ```
 
 Once proposals appear, inspect them:
 
 ```bash
-kubectl get networkpolicyproposals -n demo -o yaml
+kubectl get workloadnetworkpolicyproposals -n demo -o yaml
 ```
 
 You should see `deployment-frontend`, `deployment-backend`, and
@@ -63,7 +63,7 @@ You should see `deployment-frontend`, `deployment-backend`, and
 Requires Calico CNI:
 
 ```bash
-kubectl label networkpolicyproposal deployment-backend -n demo \
+kubectl label workloadnetworkpolicyproposal deployment-backend -n demo \
   security.rancher.io/enforce=true
 
 kubectl get networkpolicies.crd.projectcalico.org -n demo
@@ -83,5 +83,5 @@ go run ./hack/demo/simulate-flows
 
 # Terminal 3: apply workloads and watch
 kubectl apply -f hack/demo/workloads.yaml
-kubectl get networkpolicyproposals -n demo -w
+kubectl get workloadnetworkpolicyproposals -n demo -w
 ```

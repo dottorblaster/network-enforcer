@@ -6,7 +6,7 @@
 
 Network Enforcer is a Kubernetes-focused project that helps teams move from permissive networking to policy-driven cluster security.
 
-It observes real network flows from running workloads, correlates traffic patterns, and produces `NetworkPolicyProposal` resources that describe suggested ingress/egress rules. These proposals can be reviewed and validated before they are enforced, so teams keep control while reducing trial-and-error.
+It observes real network flows from running workloads, correlates traffic patterns, and produces `WorkloadNetworkPolicyProposal` resources that describe suggested ingress/egress rules. These proposals can be reviewed and validated before they are enforced, so teams keep control while reducing trial-and-error.
 
 The project is built around two core components: a Kubernetes controller that manages policy proposal lifecycle and reconciliation, and a CNI watcher that gathers network telemetry from the cluster data plane.
 

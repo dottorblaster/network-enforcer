@@ -71,7 +71,7 @@ func assessPolicyProposalsGenerated(ctx context.Context, t *testing.T, _ *envcon
 	dstPort := intstr.FromInt(80)
 	dnsPort := intstr.FromInt(53)
 
-	expectedClientEgressProposal := securityv1alpha1.NetworkPolicyProposal{
+	expectedClientEgressProposal := securityv1alpha1.WorkloadNetworkPolicyProposal{
 		ObjectMeta: metav1.ObjectMeta{
 			Name:      "deployment-" + simpleAppClientDeploymentName + "-egress",
 			Namespace: namespace,
@@ -121,7 +121,7 @@ func assessPolicyProposalsGenerated(ctx context.Context, t *testing.T, _ *envcon
 			},
 		},
 	}
-	expectedServerIngressProposal := securityv1alpha1.NetworkPolicyProposal{
+	expectedServerIngressProposal := securityv1alpha1.WorkloadNetworkPolicyProposal{
 		ObjectMeta: metav1.ObjectMeta{
 			Name:      "deployment-" + simpleAppServerDeploymentName + "-ingress",
 			Namespace: namespace,
@@ -154,7 +154,7 @@ func assessPolicyProposalsGenerated(ctx context.Context, t *testing.T, _ *envcon
 		},
 	}
 
-	var proposals securityv1alpha1.NetworkPolicyProposalList
+	var proposals securityv1alpha1.WorkloadNetworkPolicyProposalList
 	require.Eventually(t, func() bool {
 		err := getClient(ctx).WithNamespace(namespace).List(ctx, &proposals)
 		require.NoError(t, err, "failed to list network policy proposals")

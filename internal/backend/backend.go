@@ -10,7 +10,7 @@ import (
 type PolicyBackend interface {
 	Name() string
 	AddToScheme(s *runtime.Scheme) error
-	Build(proposal *securityv1alpha1.NetworkPolicyProposal) client.Object
+	Build(proposal *securityv1alpha1.WorkloadNetworkPolicyProposal) client.Object
 	// Empty returns a zero-value instance for client.Get.
 	Empty() client.Object
 }

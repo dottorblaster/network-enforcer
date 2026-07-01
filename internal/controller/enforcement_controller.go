@@ -42,14 +42,14 @@ type EnforcementReconciler struct {
 	Backend backend.PolicyBackend
 }
 
-// +kubebuilder:rbac:groups=security.rancher.io,resources=networkpolicyproposals,verbs=get;list;watch;update;patch
-// +kubebuilder:rbac:groups=security.rancher.io,resources=networkpolicyproposals/status,verbs=get;update;patch
+// +kubebuilder:rbac:groups=security.rancher.io,resources=workloadnetworkpolicyproposals,verbs=get;list;watch;update;patch
+// +kubebuilder:rbac:groups=security.rancher.io,resources=workloadnetworkpolicyproposals/status,verbs=get;update;patch
 // +kubebuilder:rbac:groups=apps,resources=deployments;statefulsets;daemonsets,verbs=get;list;watch
 
 func (r *EnforcementReconciler) Reconcile(ctx context.Context, req ctrl.Request) (ctrl.Result, error) {
 	log := logf.FromContext(ctx)
 
-	var proposal securityv1alpha1.NetworkPolicyProposal
+	var proposal securityv1alpha1.WorkloadNetworkPolicyProposal
 	if err := r.Get(ctx, req.NamespacedName, &proposal); err != nil {
 		return ctrl.Result{}, client.IgnoreNotFound(err)
 	}
@@ -87,7 +87,7 @@ func (r *EnforcementReconciler) Reconcile(ctx context.Context, req ctrl.Request)
 
 func (r *EnforcementReconciler) SetupWithManager(mgr ctrl.Manager) error {
 	return ctrl.NewControllerManagedBy(mgr).
-		For(&securityv1alpha1.NetworkPolicyProposal{}).
+		For(&securityv1alpha1.WorkloadNetworkPolicyProposal{}).
 		WithEventFilter(predicate.Funcs{
 			UpdateFunc: func(e event.UpdateEvent) bool {
 				oldLabels := e.ObjectOld.GetLabels()

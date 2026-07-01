@@ -145,7 +145,10 @@ func setupSimpleAppWorkload(ctx context.Context, t *testing.T, _ *envconf.Config
 	return ctx
 }
 
-func requireEqualNetworkPolicyProposal(t *testing.T, expected, actual securityv1alpha1.NetworkPolicyProposal) {
+func requireEqualNetworkPolicyProposal(
+	t *testing.T,
+	expected, actual securityv1alpha1.WorkloadNetworkPolicyProposal,
+) {
 	// Metadata
 	require.Equal(t, expected.Name, actual.Name, "network policy proposal name does not match expected")
 	require.Equal(t, expected.Namespace, actual.Namespace, "network policy proposal namespace does not match expected")
