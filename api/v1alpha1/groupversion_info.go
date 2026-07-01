@@ -36,7 +36,11 @@ var (
 
 // addKnownTypes registers the API types belonging to this group version with the scheme.
 func addKnownTypes(scheme *runtime.Scheme) error {
-	scheme.AddKnownTypes(GroupVersion, &NetworkPolicyProposal{}, &NetworkPolicyProposalList{})
+	scheme.AddKnownTypes(
+		GroupVersion,
+		&WorkloadNetworkPolicyProposal{},
+		&WorkloadNetworkPolicyProposalList{},
+	)
 	metav1.AddToGroupVersion(scheme, GroupVersion)
 	return nil
 }

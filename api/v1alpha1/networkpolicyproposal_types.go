@@ -21,7 +21,7 @@ import (
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 )
 
-type NetworkPolicyProposalStatus struct {
+type WorkloadNetworkPolicyProposalStatus struct {
 	// conditions represent the current state of the proposal.
 	// +listType=map
 	// +listMapKey=type
@@ -31,10 +31,10 @@ type NetworkPolicyProposalStatus struct {
 
 // +kubebuilder:object:root=true
 // +kubebuilder:subresource:status
-// +kubebuilder:resource:shortName=npp
+// +kubebuilder:resource:shortName=wnpp
 // +kubebuilder:printcolumn:name="Age",type=date,JSONPath=`.metadata.creationTimestamp`
 
-type NetworkPolicyProposal struct {
+type WorkloadNetworkPolicyProposal struct {
 	metav1.TypeMeta `json:",inline"`
 
 	// +optional
@@ -44,14 +44,14 @@ type NetworkPolicyProposal struct {
 	Spec networkingv1.NetworkPolicySpec `json:"spec"`
 
 	// +optional
-	Status NetworkPolicyProposalStatus `json:"status,omitzero"`
+	Status WorkloadNetworkPolicyProposalStatus `json:"status,omitzero"`
 }
 
 // +kubebuilder:object:root=true
 
-type NetworkPolicyProposalList struct {
+type WorkloadNetworkPolicyProposalList struct {
 	metav1.TypeMeta `json:",inline"`
 	metav1.ListMeta `json:"metadata,omitzero"`
 
-	Items []NetworkPolicyProposal `json:"items"`
+	Items []WorkloadNetworkPolicyProposal `json:"items"`
 }

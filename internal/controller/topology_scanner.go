@@ -64,8 +64,8 @@ func (ts *TopologyScanner) Start(ctx context.Context) error {
 func getProposalMetadata(
 	workload topology.WorkloadKey,
 	direction networkingv1.PolicyType,
-) *securityv1alpha1.NetworkPolicyProposal {
-	return &securityv1alpha1.NetworkPolicyProposal{
+) *securityv1alpha1.WorkloadNetworkPolicyProposal {
+	return &securityv1alpha1.WorkloadNetworkPolicyProposal{
 		ObjectMeta: metav1.ObjectMeta{
 			Name: fmt.Sprintf(
 				"%s-%s-%s",

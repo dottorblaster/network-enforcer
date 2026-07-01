@@ -30,7 +30,7 @@ rules:
 - apiGroups:
   - security.rancher.io
   resources:
-  - networkpolicyproposals
+  - workloadnetworkpolicyproposals
   verbs:
   - create
   - delete
@@ -42,13 +42,13 @@ rules:
 - apiGroups:
   - security.rancher.io
   resources:
-  - networkpolicyproposals/finalizers
+  - workloadnetworkpolicyproposals/finalizers
   verbs:
   - update
 - apiGroups:
   - security.rancher.io
   resources:
-  - networkpolicyproposals/status
+  - workloadnetworkpolicyproposals/status
   verbs:
   - get
   - patch

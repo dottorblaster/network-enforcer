@@ -19,7 +19,7 @@ func (b *Backend) Empty() client.Object {
 	return &networkingv1.NetworkPolicy{}
 }
 
-func (b *Backend) Build(proposal *securityv1alpha1.NetworkPolicyProposal) client.Object {
+func (b *Backend) Build(proposal *securityv1alpha1.WorkloadNetworkPolicyProposal) client.Object {
 	return &networkingv1.NetworkPolicy{
 		ObjectMeta: metav1.ObjectMeta{
 			Name:      proposal.Name,
