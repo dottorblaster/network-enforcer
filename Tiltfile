@@ -42,6 +42,21 @@ helm_resource(
     ]
 )
 
+# Prepare Helm set values based on CNI type
+helm_set_values = [
+    "controller.image.repository=" + controller_image,
+    "controller.replicas=1",
+    "controller.containerSecurityContext.runAsUser=null",
+    "controller.podSecurityContext.runAsNonRoot=false",
+    "cniwatcher.enabled=" + ("true" if cniwatcher_enabled else "false"),
+    "cniwatcher.image.repository=" + cniwatcher_image,
+    "cniwatcher.image.tag=" + cniwatcher_tag,
+    "cniwatcher.cniType=" + cni_type,
+	"cniwatcher.containerSecurityContext.runAsUser=null",
+    "cniwatcher.podSecurityContext.runAsNonRoot=false",
+    "cniwatcher.otelEndpoint=opentelemetry-collector." + release_namespace + ".svc.cluster.local:4317",
+]
+
 # For development, handle CNI setup in Kind cluster
 if cniwatcher_enabled:
     if cni_type == "cilium":
@@ -60,11 +75,19 @@ if cniwatcher_enabled:
                 "--set", "hubble.enabled=true"
             ]
         )
+
+        helm_set_values.extend([
+            "cniwatcher.cilium.hubbleEndpoint=unix:///var/run/cilium/hubble.sock"
+        ])
     elif cni_type == "calico":
         local_resource(
             "setup_calico",
             "CNIWATCHER_NAMESPACE=" + release_namespace + " bash ./hack/setup-calico.sh"
         )
+
+        helm_set_values.extend([
+            "cniwatcher.calico.goldmaneEndpoint=goldmane.calico-system.svc:7443"
+        ])
     elif cni_type == "flannel":
         local_resource(
             "setup_flannel_in_kind",
@@ -74,6 +97,10 @@ if cniwatcher_enabled:
                 DROP by policy default/allow-all IN=eth0 OUT=eth1 MAC=00:11:22:33:44:55 SRC=192.168.1.100 \
                 DST=192.168.1.200 PROTO=TCP SPT=12345 DPT=80\" > /var/log/ulog/syslogemu.log'",
         )
+
+        helm_set_values.extend([
+            "cniwatcher.podSecurityContext.fsGroup=4"
+        ])
     elif cni_type == "aws-vpc":
         local_resource(
             "setup_aws_vpc_in_kind",
@@ -83,36 +110,6 @@ if cniwatcher_enabled:
                 default/aws-policy IN=eni-12345 OUT=eni-67890 SRC=10.0.1.100 DST=10.0.1.200 PROTO=TCP \
                 SPT=12345 DPT=80\" > /var/log/aws-routed-eni/network-policy-agent.log'",
         )
-
-# Prepare Helm set values based on CNI type
-helm_set_values = [
-    "controller.image.repository=" + controller_image,
-    "controller.replicas=1",
-    "controller.containerSecurityContext.runAsUser=null",
-    "controller.podSecurityContext.runAsNonRoot=false",
-    "cniwatcher.enabled=" + ("true" if cniwatcher_enabled else "false"),
-    "cniwatcher.image.repository=" + cniwatcher_image,
-    "cniwatcher.image.tag=" + cniwatcher_tag,
-    "cniwatcher.cniType=" + cni_type,
-	"cniwatcher.containerSecurityContext.runAsUser=null",
-    "cniwatcher.podSecurityContext.runAsNonRoot=false",
-    "cniwatcher.otelEndpoint=opentelemetry-collector." + release_namespace + ".svc.cluster.local:4317",
-]
-
-# Add CNI-specific configuration values
-if cniwatcher_enabled:
-    if cni_type == "cilium":
-        helm_set_values.extend([
-            "cniwatcher.cilium.hubbleEndpoint=unix:///var/run/cilium/hubble.sock"
-        ])
-    elif cni_type == "calico":
-        helm_set_values.extend([
-            "cniwatcher.calico.goldmaneEndpoint=goldmane.calico-system.svc:7443"
-        ])
-    elif cni_type == "flannel":
-        helm_set_values.extend([
-            "cniwatcher.podSecurityContext.fsGroup=4"
-        ])
 
 yaml = helm(
     "./charts/network-enforcer",
