@@ -3,7 +3,7 @@ apiVersion: apps/v1
 kind: DaemonSet
 metadata:
   name: {{ include "network-enforcer.fullname" . }}-cniwatcher
-  namespace: {{ include "network-enforcer.cniwatcher.namespace" . }}
+  namespace: {{ .Release.Namespace }}
   labels:
     app.kubernetes.io/name: {{ include "network-enforcer.name" . }}-cniwatcher
     app.kubernetes.io/part-of: {{ include "network-enforcer.name" . }}

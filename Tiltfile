@@ -9,8 +9,9 @@ update_settings(
 
 # Create the namespace
 # This is required since the helm() function doesn't support the create_namespace flag
+release_namespace = "network-enforcer"
 load("ext://namespace", "namespace_create")
-namespace_create("network-enforcer")
+namespace_create(release_namespace)
 
 controller_image = settings.get("controller").get("image")
 
@@ -26,7 +27,7 @@ helm_repo("open-telemetry", "https://open-telemetry.github.io/opentelemetry-helm
 helm_resource(
     "opentelemetry-collector",    
     "open-telemetry/opentelemetry-collector",
-    namespace="network-enforcer",
+    namespace=release_namespace,
     flags=[
         "--set", "image.repository=otel/opentelemetry-collector-k8s",
         "--set", "mode=deployment",
@@ -64,7 +65,7 @@ if cniwatcher_enabled:
 
         local_resource(
             "setup_calico",
-            "bash ./hack/setup-calico.sh"
+            "CNIWATCHER_NAMESPACE=" + release_namespace + " bash ./hack/setup-calico.sh"
         )
     elif cni_type == "flannel":
         local_resource(
@@ -97,35 +98,28 @@ helm_set_values = [
     "cniwatcher.cniType=" + cni_type,
 	"cniwatcher.containerSecurityContext.runAsUser=null",
     "cniwatcher.podSecurityContext.runAsNonRoot=false",
-    "cniwatcher.otelEndpoint=opentelemetry-collector.network-enforcer.svc.cluster.local:4317",
+    "cniwatcher.otelEndpoint=opentelemetry-collector." + release_namespace + ".svc.cluster.local:4317",
 ]
 
 # Add CNI-specific configuration values
 if cniwatcher_enabled:
     if cni_type == "cilium":
         helm_set_values.extend([
-            "cniwatcher.cilium.namespace=kube-system",
             "cniwatcher.cilium.hubbleEndpoint=unix:///var/run/cilium/hubble.sock"
         ])
     elif cni_type == "calico":
         helm_set_values.extend([
-            "cniwatcher.calico.namespace=calico-system",
             "cniwatcher.calico.goldmaneEndpoint=goldmane.calico-system.svc:7443"
         ])
     elif cni_type == "flannel":
         helm_set_values.extend([
-            "cniwatcher.flannel.namespace=kube-system",
             "cniwatcher.podSecurityContext.fsGroup=4"
-        ])
-    elif cni_type == "aws-vpc":
-        helm_set_values.extend([
-            "cniwatcher.aws-vpc.namespace=kube-system"
         ])
 
 yaml = helm(
     "./charts/network-enforcer",
     name="network-enforcer",
-    namespace="network-enforcer",
+    namespace=release_namespace,
     set=helm_set_values
 )
 

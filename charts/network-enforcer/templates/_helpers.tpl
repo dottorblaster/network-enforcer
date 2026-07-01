@@ -51,15 +51,6 @@ app.kubernetes.io/instance: {{ .Release.Name }}
 {{- end }}
 
 {{/*
-Set namespace based on CNI type
-*/}}
-{{- define "network-enforcer.cniwatcher.namespace" -}}
-{{- $cni := .Values.cniwatcher.cniType -}}
-{{- $cniConfig := index .Values.cniwatcher $cni | default dict -}}
-{{- default "kube-system" $cniConfig.namespace -}}
-{{- end }}
-
-{{/*
 Set OTEL endpoint (defaults to controller OTLP service in release namespace)
 */}}
 {{- define "network-enforcer.cniwatcher.otelEndpoint" -}}

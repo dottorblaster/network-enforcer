@@ -3,6 +3,7 @@
 set -eu
 
 CALICO_VERSION="v3.32.1"
+CNIWATCHER_NAMESPACE="${CNIWATCHER_NAMESPACE:-network-enforcer}"
 
 helm repo add projectcalico https://docs.tigera.io/calico/charts
 helm repo update
@@ -35,5 +36,5 @@ kubectl create secret generic cniwatcher-goldmane-key-pair \
   --from-file=ca.crt=<(kubectl -n calico-system get configmap goldmane-ca-bundle -o jsonpath='{.data.tigera-ca-bundle\.crt}') \
   --from-file=tls.crt=<(kubectl -n calico-system get secret goldmane-key-pair -o jsonpath='{.data.tls\.crt}' | base64 -d) \
   --from-file=tls.key=<(kubectl -n calico-system get secret goldmane-key-pair -o jsonpath='{.data.tls\.key}' | base64 -d) \
-  -n calico-system \
+  -n "$CNIWATCHER_NAMESPACE" \
   --dry-run=client -o yaml | kubectl apply -f -

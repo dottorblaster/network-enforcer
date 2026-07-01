@@ -3,6 +3,14 @@ templates:
   - "templates/cniwatcher/daemonset.yaml"
 
 tests:
+  - it: "should deploy cniwatcher in release namespace"
+    release:
+      namespace: example-namespace
+    asserts:
+      - equal:
+          path: "metadata.namespace"
+          value: "example-namespace"
+
   - it: "should allow image, and imagePullPolicy to be overridden"
     set:
       cniwatcher:

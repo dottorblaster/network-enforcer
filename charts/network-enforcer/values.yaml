@@ -88,14 +88,8 @@ cniwatcher:
   # Empty string uses {{ release-name }}-otlp.{{ namespace }}.svc.cluster.local:4317
   otelEndpoint: ""
   calico:
-    namespace: calico-system
     goldmaneEndpoint: goldmane.calico-system.svc:7443
   cilium:
-    namespace: kube-system
     hubbleEndpoint: unix:///var/run/cilium/hubble.sock
-  flannel:
-    namespace: kube-system
-  "aws-vpc":
-    namespace: kube-system
   serviceAccount:
     annotations: {}
