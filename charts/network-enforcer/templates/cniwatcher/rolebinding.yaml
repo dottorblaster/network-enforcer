@@ -12,5 +12,5 @@ roleRef:
 subjects:
 - kind: ServiceAccount
   name: {{ include "network-enforcer.fullname" . }}-cniwatcher
-  namespace: {{ include "network-enforcer.cniwatcher.namespace" . }}
+  namespace: {{ .Release.Namespace }}
 {{- end }}

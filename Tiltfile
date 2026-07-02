@@ -9,8 +9,9 @@ update_settings(
 
 # Create the namespace
 # This is required since the helm() function doesn't support the create_namespace flag
+release_namespace = "network-enforcer"
 load("ext://namespace", "namespace_create")
-namespace_create("network-enforcer")
+namespace_create(release_namespace)
 
 controller_image = settings.get("controller").get("image")
 
@@ -26,7 +27,7 @@ helm_repo("open-telemetry", "https://open-telemetry.github.io/opentelemetry-helm
 helm_resource(
     "opentelemetry-collector",    
     "open-telemetry/opentelemetry-collector",
-    namespace="network-enforcer",
+    namespace=release_namespace,
     flags=[
         "--set", "image.repository=otel/opentelemetry-collector-k8s",
         "--set", "mode=deployment",
@@ -40,6 +41,21 @@ helm_resource(
         "--set", "config.service.pipelines.traces.exporters[0]=debug"
     ]
 )
+
+# Prepare Helm set values based on CNI type
+helm_set_values = [
+    "controller.image.repository=" + controller_image,
+    "controller.replicas=1",
+    "controller.containerSecurityContext.runAsUser=null",
+    "controller.podSecurityContext.runAsNonRoot=false",
+    "cniwatcher.enabled=" + ("true" if cniwatcher_enabled else "false"),
+    "cniwatcher.image.repository=" + cniwatcher_image,
+    "cniwatcher.image.tag=" + cniwatcher_tag,
+    "cniwatcher.cniType=" + cni_type,
+	"cniwatcher.containerSecurityContext.runAsUser=null",
+    "cniwatcher.podSecurityContext.runAsNonRoot=false",
+    "cniwatcher.otelEndpoint=opentelemetry-collector." + release_namespace + ".svc.cluster.local:4317",
+]
 
 # For development, handle CNI setup in Kind cluster
 if cniwatcher_enabled:
@@ -59,48 +75,19 @@ if cniwatcher_enabled:
                 "--set", "hubble.enabled=true"
             ]
         )
+
+        helm_set_values.extend([
+            "cniwatcher.cilium.hubbleEndpoint=unix:///var/run/cilium/hubble.sock"
+        ])
     elif cni_type == "calico":
-        namespace_create("calico-system")
-
         local_resource(
-            "install_calico_operator",
-            "kubectl create -f https://raw.githubusercontent.com/projectcalico/calico/v3.30.2/manifests/tigera-operator.yaml",
+            "setup_calico",
+            "CNIWATCHER_NAMESPACE=" + release_namespace + " bash ./hack/setup-calico.sh"
         )
 
-        local_resource(
-            "wait_for_tigera_operator",
-            "kubectl wait --for=condition=ready pod -l name=tigera-operator -n tigera-operator --timeout=300s && echo 'Tigera operator is ready!'",
-            deps=["install_calico_operator"]
-        )
-
-        local_resource(
-            "setup_calico_custom_resources",
-            "kubectl apply -f https://raw.githubusercontent.com/projectcalico/calico/v3.30.2/manifests/custom-resources.yaml",
-            deps=["wait_for_tigera_operator"],
-        )
-
-        local_resource(
-            "install_goldmane",
-            "kubectl apply -f - <<EOF\napiVersion: operator.tigera.io/v1\nkind: Goldmane\nmetadata:\n  name: default\n  namespace: calico-system\nEOF",
-            deps=["setup_calico_custom_resources"]
-        )
-
-        local_resource(
-            "extract_goldmane_certs",
-            "mkdir -p certs && \
-             kubectl get cm -n calico-system goldmane-ca-bundle -o jsonpath='{.data.tigera-ca-bundle\\.crt}' > certs/ca.crt && \
-             kubectl -n calico-system get secret goldmane-key-pair -o jsonpath='{.data.tls\\.crt}' | base64 -d > certs/tls.crt && \
-             kubectl -n calico-system get secret goldmane-key-pair -o jsonpath='{.data.tls\\.key}' | base64 -d > certs/tls.key",
-            deps=["install_goldmane"]
-        )
-
-        local_resource(
-            "create_goldmane_secret",
-            "kubectl create secret generic cniwatcher-goldmane-key-pair --from-file=tls.key=certs/tls.key \
-                --from-file=tls.crt=certs/tls.crt --from-file=ca.crt=certs/ca.crt -n calico-system \
-                --dry-run=client -o yaml | kubectl apply -f -",
-            deps=["extract_goldmane_certs"]
-        )
+        helm_set_values.extend([
+            "cniwatcher.calico.goldmaneEndpoint=goldmane.calico-system.svc:7443"
+        ])
     elif cni_type == "flannel":
         local_resource(
             "setup_flannel_in_kind",
@@ -110,6 +97,10 @@ if cniwatcher_enabled:
                 DROP by policy default/allow-all IN=eth0 OUT=eth1 MAC=00:11:22:33:44:55 SRC=192.168.1.100 \
                 DST=192.168.1.200 PROTO=TCP SPT=12345 DPT=80\" > /var/log/ulog/syslogemu.log'",
         )
+
+        helm_set_values.extend([
+            "cniwatcher.podSecurityContext.fsGroup=4"
+        ])
     elif cni_type == "aws-vpc":
         local_resource(
             "setup_aws_vpc_in_kind",
@@ -120,44 +111,10 @@ if cniwatcher_enabled:
                 SPT=12345 DPT=80\" > /var/log/aws-routed-eni/network-policy-agent.log'",
         )
 
-# Prepare Helm set values based on CNI type
-helm_set_values = [
-    "controller.image.repository=" + controller_image,
-    "controller.replicas=1",
-    "controller.containerSecurityContext.runAsUser=null",
-    "controller.podSecurityContext.runAsNonRoot=false",
-    "cniwatcher.enabled=" + ("true" if cniwatcher_enabled else "false"),
-    "cniwatcher.image.repository=" + cniwatcher_image,
-    "cniwatcher.image.tag=" + cniwatcher_tag,
-    "cniwatcher.cniType=" + cni_type,
-    "cniwatcher.otelEndpoint=opentelemetry-collector.network-enforcer.svc.cluster.local:4317",
-]
-
-# Add CNI-specific configuration values
-if cniwatcher_enabled:
-    if cni_type == "cilium":
-        helm_set_values.extend([
-            "cniwatcher.cilium.namespace=kube-system",
-            "cniwatcher.cilium.hubbleEndpoint=unix:///var/run/cilium/hubble.sock"
-        ])
-    elif cni_type == "calico":
-        helm_set_values.extend([
-            "cniwatcher.calico.namespace=calico-system",
-            "cniwatcher.calico.goldmaneEndpoint=goldmane.calico-system.svc:7443"
-        ])
-    elif cni_type == "flannel":
-        helm_set_values.extend([
-            "cniwatcher.flannel.namespace=kube-system"
-        ])
-    elif cni_type == "aws-vpc":
-        helm_set_values.extend([
-            "cniwatcher.awsVPC.namespace=kube-system"
-        ])
-
 yaml = helm(
     "./charts/network-enforcer",
     name="network-enforcer",
-    namespace="network-enforcer",
+    namespace=release_namespace,
     set=helm_set_values
 )
 
