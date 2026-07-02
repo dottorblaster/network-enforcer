@@ -18,6 +18,9 @@ helm template calico-crds projectcalico/crd.projectcalico.org.v1 --version $CALI
 
 printf "\n- 🚀 Deploy tigera-operator:\n"
 # As a dataplane for now we use the default one: Iptables # https://github.com/projectcalico/calico/blob/58949447b523cd9ed372c7cbcf3601c027fa80d8/charts/tigera-operator/values.yaml#L48
+# To enable trace logs in calico:
+# --set 'defaultFelixConfiguration.enabled=true'
+# --set 'defaultFelixConfiguration.logSeverityScreen=Trace'
 helm upgrade --install calico projectcalico/tigera-operator \
   --version $CALICO_VERSION \
   --namespace tigera-operator \
