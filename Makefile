@@ -57,6 +57,13 @@ endef
 TARGET=controller cniwatcher
 $(foreach T,$(TARGET),$(eval $(call BUILD_template,$(T))))
 
+.PHONY: manifests
+manifests: controller-gen ## Generate WebhookConfiguration, ClusterRole and CustomResourceDefinition objects.
+	"$(CONTROLLER_GEN)" "crd:allowDangerousTypes=true" rbac:roleName=manager-role \
+		paths="./..." \
+		output:crd:dir=config/crd/bases \
+		output:rbac:dir=config/rbac
+
 .PHONY: generate
 generate: controller-gen ## Generate code containing DeepCopy, DeepCopyInto, and DeepCopyObject method implementations.
 	"$(CONTROLLER_GEN)" object:headerFile="hack/boilerplate.go.txt" paths="./..."
