@@ -43,11 +43,11 @@ type WorkloadNetworkPolicySpec struct {
 	// +optional
 	Mode WorkloadNetworkPolicyMode `json:"mode,omitempty"`
 
-	// Policy is the embedded networking.k8s.io NetworkPolicySpec that this
-	// resource represents at runtime. The semantics of the policy are
+	// PolicyTemplate is the embedded networking.k8s.io NetworkPolicySpec that
+	// this resource represents at runtime. The semantics of the policy are
 	// selected by Mode; the spec itself is identical to a NetworkPolicySpec.
 	// +required
-	Policy networkingv1.NetworkPolicySpec `json:"policy"`
+	PolicyTemplate networkingv1.NetworkPolicySpec `json:"policyTemplate"`
 }
 
 // WorkloadNetworkPolicy is the schema for the runtime network policy API.
