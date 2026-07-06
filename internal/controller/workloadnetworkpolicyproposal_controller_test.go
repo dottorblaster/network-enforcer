@@ -51,7 +51,6 @@ func newBaseProposal() *securityv1alpha1.WorkloadNetworkPolicyProposal {
 				{
 					To: []networkingv1.NetworkPolicyPeer{
 						{
-							// Permette il traffico solo verso questo IP (es. un server DNS)
 							IPBlock: &networkingv1.IPBlock{
 								CIDR: "10.0.0.10/32",
 							},
