@@ -129,7 +129,6 @@ func TestTopologyScannerReconcileProposal(t *testing.T) {
 			},
 		},
 		{
-			// Policy already exists, so we expect no new proposals
 			name: "policy_already_exists",
 			setup: func() []client.Object {
 				return []client.Object{promotedPolicy}
