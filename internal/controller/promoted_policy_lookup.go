@@ -15,11 +15,14 @@ func hasPromotedPolicy(
 	proposalName string,
 ) (bool, error) {
 	var policies securityv1alpha1.WorkloadNetworkPolicyList
+	matchingLabels := client.MatchingLabels{
+		securityv1alpha1.PolicyPromotedFromLabelKey: proposalName,
+	}
 	if err := c.List(
 		ctx,
 		&policies,
 		client.InNamespace(namespace),
-		client.MatchingLabels{securityv1alpha1.PolicyPromotedFromLabelKey: proposalName},
+		matchingLabels,
 	); err != nil {
 		return false, err
 	}
