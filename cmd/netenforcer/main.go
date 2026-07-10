@@ -38,7 +38,6 @@ import (
 	metricsserver "sigs.k8s.io/controller-runtime/pkg/metrics/server"
 
 	securityv1alpha1 "github.com/rancher-sandbox/network-enforcer/api/v1alpha1"
-	backendkubernetes "github.com/rancher-sandbox/network-enforcer/internal/backend/kubernetes"
 	"github.com/rancher-sandbox/network-enforcer/internal/controller"
 	"github.com/rancher-sandbox/network-enforcer/internal/receiver"
 	"github.com/rancher-sandbox/network-enforcer/internal/topology"
@@ -124,13 +123,11 @@ func run(logger *slog.Logger, conf *config) error {
 		return fmt.Errorf("unable to add topology scanner to manager: %w", err)
 	}
 
-	err = (&controller.EnforcementReconciler{
-		Client:  mgr.GetClient(),
-		Scheme:  mgr.GetScheme(),
-		Backend: &backendkubernetes.Backend{},
-	}).SetupWithManager(mgr)
-	if err != nil {
-		return fmt.Errorf("unable to setup Enforcement controller: %w", err)
+	if err = (&controller.WorkloadNetworkPolicyReconciler{
+		Client: mgr.GetClient(),
+		Scheme: mgr.GetScheme(),
+	}).SetupWithManager(mgr); err != nil {
+		return fmt.Errorf("unable to setup WorkloadNetworkPolicyReconciler controller: %w", err)
 	}
 
 	if err = (&controller.WorkloadNetworkPolicyProposalReconciler{
