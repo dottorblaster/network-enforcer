@@ -5,11 +5,13 @@ import (
 	"log/slog"
 	"os"
 	"os/signal"
+	"strconv"
 	"syscall"
 	"time"
 
 	"github.com/rancher-sandbox/network-enforcer/internal/cniwatcher"
 	"github.com/rancher-sandbox/network-enforcer/internal/otel"
+	"github.com/rancher-sandbox/network-enforcer/internal/violationbuf"
 	"sigs.k8s.io/controller-runtime/pkg/client"
 	"sigs.k8s.io/controller-runtime/pkg/client/config"
 )
@@ -47,17 +49,37 @@ func main() {
 		os.Exit(1)
 	}
 
+	// Create the violation ring buffer shared between the watcher and the gRPC server.
+	violationBuffer := violationbuf.NewBuffer()
+
 	watcher := cniwatcher.Watcher{
-		Ctx:         ctx,
-		Client:      ctrlClient,
-		Log:         logger,
-		OtelService: otelService,
+		Ctx:             ctx,
+		Client:          ctrlClient,
+		Log:             logger,
+		NodeName:        cniwatcherCfg.NodeName,
+		OtelService:     otelService,
+		ViolationBuffer: violationBuffer,
 	}
 
 	cniWatcher, err := cniwatcher.NewCNIWatcher(cniwatcherCfg, watcher)
 	if err != nil {
 		logger.Error("Failed to create cniWatcher", "err", err)
 		os.Exit(1)
+	}
+
+	// Parse gRPC port from env or use default.
+	grpcPort := cniwatcher.DefaultGRPCPort
+	if portStr := os.Getenv("CNIWATCHER_GRPC_PORT"); portStr != "" {
+		if p, parseErr := strconv.Atoi(portStr); parseErr == nil && p > 0 {
+			grpcPort = p
+		}
+	}
+
+	// TODO: Add mTLS support for the gRPC server in a follow-up.
+	// Port tlsutil cert loading behind a --cniwatcher-tls-cert-dir flag so an
+	// insecure default keeps the dev/kind path simple.
+	grpcConfig := cniwatcher.GRPCServerConfig{
+		Port: grpcPort,
 	}
 
 	shutdownCh := make(chan struct{})
@@ -71,15 +93,28 @@ func main() {
 		close(shutdownCh)
 	}()
 
-	errCh := make(chan error, 1)
+	// Start the gRPC ScrapeViolations server in a goroutine.
+	grpcErrCh := make(chan error, 1)
 	go func() {
-		errCh <- cniWatcher.Start()
+		grpcErrCh <- cniwatcher.StartGRPCServer(ctx, logger, violationBuffer, grpcConfig)
 	}()
 
+	// Start the CNI watcher in a goroutine.
+	watcherErrCh := make(chan error, 1)
+	go func() {
+		watcherErrCh <- cniWatcher.Start()
+	}()
+
+	// Wait for shutdown signal or an error from either the CNI watcher or gRPC server.
 	select {
-	case startErr := <-errCh:
+	case startErr := <-watcherErrCh:
 		if startErr != nil {
 			logger.Error("Failed to start cniWatcher", "err", startErr)
+			os.Exit(1)
+		}
+	case grpcStartErr := <-grpcErrCh:
+		if grpcStartErr != nil {
+			logger.Error("Failed to start gRPC server", "err", grpcStartErr)
 			os.Exit(1)
 		}
 	case <-shutdownCh:
@@ -103,4 +138,8 @@ func performCleanupAndShutdown(logger *slog.Logger, otelService *otel.Service, c
 	if shutdownErr := cniWatcher.Shutdown(); shutdownErr != nil {
 		logger.Error("Failed to shutdown cniWatcher", "err", shutdownErr)
 	}
+
+	// Note: the gRPC server shuts down automatically when ctx is cancelled
+	// via the StartGRPCServer function's graceful shutdown logic.
+	logger.Info("Shutdown complete")
 }

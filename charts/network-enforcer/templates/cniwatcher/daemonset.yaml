@@ -28,6 +28,10 @@ spec:
           imagePullPolicy: {{ .Values.cniwatcher.image.pullPolicy }}
           {{- $cni := .Values.cniwatcher.cniType }}
           securityContext: {{- toYaml .Values.cniwatcher.containerSecurityContext | nindent 12 }}
+          ports:
+            - name: grpc-scrape
+              containerPort: {{ .Values.cniwatcher.grpcPort | default 50051 }}
+              protocol: TCP
           env:
             - name: NODE_NAME
               valueFrom:
@@ -37,6 +41,8 @@ spec:
               value: {{ include "network-enforcer.cniwatcher.otelEndpoint" . | quote }}
             - name: CNIWATCHER_CNI_TYPE
               value: {{ $cni | quote }}
+            - name: CNIWATCHER_GRPC_PORT
+              value: {{ .Values.cniwatcher.grpcPort | default 50051 | quote }}
 
             {{- if eq $cni "calico" }}
             - name: CNIWATCHER_GOLDMANE_ENDPOINT

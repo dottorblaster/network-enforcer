@@ -13,6 +13,7 @@ import (
 	"github.com/jdrews/go-tailer/glob"
 	"github.com/rancher-sandbox/network-enforcer/internal/otel"
 	"github.com/rancher-sandbox/network-enforcer/internal/types"
+	"github.com/rancher-sandbox/network-enforcer/internal/violationbuf"
 	"github.com/sirupsen/logrus"
 	corev1 "k8s.io/api/core/v1"
 	"k8s.io/apimachinery/pkg/util/wait"
@@ -36,10 +37,12 @@ type CNIWatcher interface {
 }
 
 type Watcher struct {
-	Ctx         context.Context
-	Client      client.Client
-	Log         *slog.Logger
-	OtelService *otel.Service
+	Ctx             context.Context
+	Client          client.Client
+	Log             *slog.Logger
+	NodeName        string
+	OtelService     *otel.Service
+	ViolationBuffer *violationbuf.Buffer
 }
 
 type PodOrServiceInfo struct {
@@ -71,11 +74,57 @@ func (w *Watcher) ProcessPolicyDenyEvent(event *types.PolicyDenyEvent) error {
 		return nil
 	}
 
+	if w.ViolationBuffer != nil {
+		w.recordToBuffer(event)
+	}
+
 	if w.OtelService == nil {
 		return errors.New("OpenTelemetry service is not initialized")
 	}
 
 	return w.OtelService.EmitPolicyDenyEvent(event)
+}
+
+func (w *Watcher) recordToBuffer(event *types.PolicyDenyEvent) {
+	direction := "egress"
+	denyingPolicyNamespace := ""
+	denyingPolicyName := ""
+
+	if len(event.EgressEnforcedBy) > 0 {
+		direction = "egress"
+		denyingPolicyNamespace = event.EgressEnforcedBy[0].Namespace
+		denyingPolicyName = event.EgressEnforcedBy[0].Name
+	} else if len(event.IngressEnforcedBy) > 0 {
+		direction = "ingress"
+		denyingPolicyNamespace = event.IngressEnforcedBy[0].Namespace
+		denyingPolicyName = event.IngressEnforcedBy[0].Name
+	}
+
+	nodeName := event.NodeName
+	if nodeName == "" {
+		nodeName = w.NodeName
+	}
+
+	rec := violationbuf.ViolationRecord{
+		Timestamp:              time.Unix(event.Timestamp, 0),
+		NodeName:               nodeName,
+		Direction:              direction,
+		SrcNamespace:           event.SrcNamespace,
+		SrcName:                event.SrcName,
+		SrcWorkloads:           event.SrcWorkloads,
+		SrcLabels:              event.SrcLabels,
+		DstNamespace:           event.DstNamespace,
+		DstName:                event.DstName,
+		DstWorkloads:           event.DstWorkloads,
+		DstLabels:              event.DstLabels,
+		Protocol:               event.Protocol,
+		DstPort:                event.DstPort,
+		Action:                 "protect",
+		DenyingPolicyNamespace: denyingPolicyNamespace,
+		DenyingPolicyName:      denyingPolicyName,
+	}
+
+	w.ViolationBuffer.Record(rec)
 }
 
 func (w *Watcher) GetNetworkPolicyAPIVersion(kind string) (string, error) {

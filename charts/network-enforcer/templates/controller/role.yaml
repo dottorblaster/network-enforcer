@@ -7,16 +7,6 @@ metadata:
   {{- include "network-enforcer.labels" . | nindent 4 }}
 rules:
 - apiGroups:
-  - apps
-  resources:
-  - daemonsets
-  - deployments
-  - statefulsets
-  verbs:
-  - get
-  - list
-  - watch
-- apiGroups:
   - networking.k8s.io
   resources:
   - networkpolicies
@@ -41,11 +31,3 @@ rules:
   - patch
   - update
   - watch
-- apiGroups:
-  - security.rancher.io
-  resources:
-  - workloadnetworkpolicyproposals/status
-  verbs:
-  - get
-  - patch
-  - update
