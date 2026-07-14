@@ -67,6 +67,9 @@ type PolicyDenyEvent struct {
 	DstLabels    []string        `json:"destination_labels"`
 	SrcWorkloads []string        `json:"source_workloads,omitempty"`
 	DstWorkloads []string        `json:"destination_workloads,omitempty"`
+	// Destination port. 0 when unavailable (e.g. ICMP, or backends that don't expose it).
+	// Calico and Cilium parsers populate this from their flow results.
+	DstPort int32 `json:"dst_port,omitempty"`
 	// The K8s NetworkPolicies or CiliumNetworkPolicies denying the egress of the flow
 	EgressEnforcedBy []Policy `json:"egress_enforced_by,omitempty"`
 	// The K8s NetworkPolicies or CiliumNetworkPolicies denying the ingress of the flow

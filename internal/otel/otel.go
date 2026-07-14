@@ -107,6 +107,13 @@ func addStringSliceAttr(attrs []attribute.KeyValue, key string, value []string) 
 	return attrs
 }
 
+func addIntAttr(attrs []attribute.KeyValue, key string, value int64) []attribute.KeyValue {
+	if value != 0 {
+		return append(attrs, attribute.Int64(key, value))
+	}
+	return attrs
+}
+
 func (s *Service) EmitPolicyDenyEvent(event *types.PolicyDenyEvent) error {
 	if s.Service.Tracer == nil {
 		return errors.New("OpenTelemetry is not initialized , skip emitting policy deny event")
@@ -133,6 +140,7 @@ func (s *Service) EmitPolicyDenyEvent(event *types.PolicyDenyEvent) error {
 	attrs = addStringAttr(attrs, "destination.name", event.DstName)
 	attrs = addStringSliceAttr(attrs, "destination.labels", event.DstLabels)
 	attrs = addStringSliceAttr(attrs, "destination.workloads", event.DstWorkloads)
+	attrs = addIntAttr(attrs, "destination.port", int64(event.DstPort))
 	attrs = addStringSliceAttr(attrs, "egress.enforced_by", policiesToStrings(event.EgressEnforcedBy))
 	attrs = addStringSliceAttr(attrs, "ingress.enforced_by", policiesToStrings(event.IngressEnforcedBy))
 

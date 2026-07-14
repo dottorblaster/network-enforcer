@@ -146,6 +146,7 @@ func (w *CiliumWatcher) parsePolicyDenyEvent(
 	}
 
 	var proto string
+	var dstPort int32
 	var srcNamespace, srcName, dstNamespace, dstName string
 	var srcLabels, dstLabels []string
 	var srcWorkloads, dstWorkloads []string
@@ -164,12 +165,15 @@ func (w *CiliumWatcher) parsePolicyDenyEvent(
 		switch l4.GetProtocol().(type) {
 		case *flowpb.Layer4_TCP:
 			proto = string(types.ProtocolTCP)
+			dstPort = int32(l4.GetTCP().GetDestinationPort()) //nolint:gosec // port 0-65535 fits int32
 		case *flowpb.Layer4_UDP:
 			proto = string(types.ProtocolUDP)
+			dstPort = int32(l4.GetUDP().GetDestinationPort()) //nolint:gosec // port 0-65535 fits int32
 		case *flowpb.Layer4_ICMPv4, *flowpb.Layer4_ICMPv6:
 			proto = string(types.ProtocolICMP)
 		case *flowpb.Layer4_SCTP:
 			proto = string(types.ProtocolSCTP)
+			dstPort = int32(l4.GetSCTP().GetDestinationPort()) //nolint:gosec // port 0-65535 fits int32
 		default:
 			proto = string(types.ProtocolUnknown)
 		}
@@ -197,6 +201,7 @@ func (w *CiliumWatcher) parsePolicyDenyEvent(
 		DstLabels:         dstLabels,
 		SrcWorkloads:      srcWorkloads,
 		DstWorkloads:      dstWorkloads,
+		DstPort:           dstPort,
 		EgressEnforcedBy:  egressPolicies,
 		IngressEnforcedBy: ingressPolicies,
 	}

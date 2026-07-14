@@ -62,6 +62,9 @@ cniwatcher:
   enabled: true
   # Valid values: aws-vpc, calico, cilium, flannel
   cniType: calico
+  # Port for the gRPC ScrapeViolations server. The controller scrapes violations
+  # from each cniwatcher pod on this port.
+  grpcPort: 50051
   podSecurityContext:
     runAsNonRoot: true # this should be false for aws-vpc
     seccompProfile:

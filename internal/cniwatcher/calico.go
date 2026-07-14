@@ -225,6 +225,7 @@ func (w *CalicoWatcher) parsePolicyDenyEvent(flowResult *pb.FlowResult) (*types.
 		DstNamespace:      key.GetDestNamespace(),
 		DstName:           key.GetDestName(),
 		DstLabels:         flow.GetDestLabels(),
+		DstPort:           int32(key.GetDestPort()), //nolint:gosec // port 0-65535 fits int32
 		EgressEnforcedBy:  egressPolicies,
 		IngressEnforcedBy: ingressPolicies,
 	}
