@@ -9,6 +9,7 @@
 # Re-include Go module files
 !go.mod
 !go.sum
+!Makefile
 
 # Re-include built binary for Tilt dev builds
 !bin/controller
