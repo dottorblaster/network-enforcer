@@ -5,6 +5,7 @@ import (
 	"strconv"
 	"strings"
 
+	corev1 "k8s.io/api/core/v1"
 	networkingv1 "k8s.io/api/networking/v1"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/util/intstr"
@@ -87,7 +88,7 @@ func (v ViolationRecord) ToEgressRule() networkingv1.NetworkPolicyEgressRule {
 			{
 				NamespaceSelector: &metav1.LabelSelector{
 					MatchLabels: map[string]string{
-						NamespaceLabelKey: v.Dest.Namespace,
+						corev1.LabelMetadataName: v.Dest.Namespace,
 					},
 				},
 			},
@@ -111,7 +112,7 @@ func (v ViolationRecord) ToIngressRule() networkingv1.NetworkPolicyIngressRule {
 			{
 				NamespaceSelector: &metav1.LabelSelector{
 					MatchLabels: map[string]string{
-						NamespaceLabelKey: v.Source.Namespace,
+						corev1.LabelMetadataName: v.Source.Namespace,
 					},
 				},
 			},

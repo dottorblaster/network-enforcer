@@ -8,6 +8,7 @@ import (
 	"strings"
 	"time"
 
+	corev1 "k8s.io/api/core/v1"
 	networkingv1 "k8s.io/api/networking/v1"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/util/intstr"
@@ -298,7 +299,7 @@ func (ts *TopologyScanner) buildPeerRuleParts(
 	policyPeer := networkingv1.NetworkPolicyPeer{
 		NamespaceSelector: &metav1.LabelSelector{
 			MatchLabels: map[string]string{
-				securityv1alpha1.NamespaceLabelKey: peer.Namespace,
+				corev1.LabelMetadataName: peer.Namespace,
 			},
 		},
 		PodSelector: &peerSelector,

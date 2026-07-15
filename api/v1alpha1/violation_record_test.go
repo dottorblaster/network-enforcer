@@ -273,7 +273,7 @@ func TestClearAllowedViolations(t *testing.T) {
 						To: []networkingv1.NetworkPolicyPeer{
 							{
 								NamespaceSelector: &metav1.LabelSelector{
-									MatchLabels: map[string]string{NamespaceLabelKey: "ns2"},
+									MatchLabels: map[string]string{corev1.LabelMetadataName: "ns2"},
 								},
 							},
 						},
@@ -303,7 +303,7 @@ func TestClearAllowedViolations(t *testing.T) {
 						From: []networkingv1.NetworkPolicyPeer{
 							{
 								NamespaceSelector: &metav1.LabelSelector{
-									MatchLabels: map[string]string{NamespaceLabelKey: "ns1"},
+									MatchLabels: map[string]string{corev1.LabelMetadataName: "ns1"},
 								},
 							},
 						},
@@ -349,7 +349,7 @@ func TestClearAllowedViolations(t *testing.T) {
 						To: []networkingv1.NetworkPolicyPeer{
 							{
 								NamespaceSelector: &metav1.LabelSelector{
-									MatchLabels: map[string]string{NamespaceLabelKey: "ns2"},
+									MatchLabels: map[string]string{corev1.LabelMetadataName: "ns2"},
 								},
 							},
 						},
@@ -370,7 +370,7 @@ func TestClearAllowedViolations(t *testing.T) {
 						To: []networkingv1.NetworkPolicyPeer{
 							{
 								NamespaceSelector: &metav1.LabelSelector{
-									MatchLabels: map[string]string{NamespaceLabelKey: "ns2"},
+									MatchLabels: map[string]string{corev1.LabelMetadataName: "ns2"},
 								},
 								PodSelector: &metav1.LabelSelector{
 									MatchLabels: map[string]string{"app": "allowed"},
@@ -651,7 +651,7 @@ func TestRecomputeStatus(t *testing.T) {
 								{
 									NamespaceSelector: &metav1.LabelSelector{
 										MatchLabels: map[string]string{
-											NamespaceLabelKey: "ns2",
+											corev1.LabelMetadataName: "ns2",
 										},
 									},
 								},

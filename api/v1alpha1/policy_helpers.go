@@ -7,9 +7,6 @@ import (
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 )
 
-// NamespaceLabelKey is the label that records the namespace name.
-const NamespaceLabelKey = "kubernetes.io/metadata.name"
-
 // SelectorEqual compares two label selectors for equality by formatting them.
 func SelectorEqual(a, b *metav1.LabelSelector) bool {
 	return metav1.FormatLabelSelector(a) == metav1.FormatLabelSelector(b)
