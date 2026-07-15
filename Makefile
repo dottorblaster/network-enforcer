@@ -278,10 +278,6 @@ generate-calico-goldmane-proto: download-calico-goldmane-proto ## Generate Go co
 		--go-grpc_out=. --go-grpc_opt=paths=source_relative \
 		internal/cniwatcher/calico/goldmane/api.proto
 
-.PHONY: build-cniwatcher-image
-build-cniwatcher-image:
-	$(CONTAINER_TOOL) build -t cniwatcher:latest -f package/Dockerfile.cniwatcher .
-
 .PHONY: test-e2e
 test-e2e: build-controller-image
 	@echo "🧪 Running e2e tests..."
