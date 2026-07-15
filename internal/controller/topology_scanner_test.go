@@ -34,11 +34,11 @@ func TestContainsRuleEgress(t *testing.T) {
 	udp := protocolPtr(corev1.ProtocolUDP)
 
 	frontend := networkingv1.NetworkPolicyPeer{
-		NamespaceSelector: labelSelector(map[string]string{securityv1alpha1.NamespaceLabelKey: "team-a"}),
+		NamespaceSelector: labelSelector(map[string]string{corev1.LabelMetadataName: "team-a"}),
 		PodSelector:       labelSelector(map[string]string{"app": "frontend"}),
 	}
 	backend := networkingv1.NetworkPolicyPeer{
-		NamespaceSelector: labelSelector(map[string]string{securityv1alpha1.NamespaceLabelKey: "team-b"}),
+		NamespaceSelector: labelSelector(map[string]string{corev1.LabelMetadataName: "team-b"}),
 		PodSelector:       labelSelector(map[string]string{"app": "backend"}),
 	}
 
@@ -103,7 +103,7 @@ func TestContainsRuleEgress(t *testing.T) {
 			name: "does not match with different selector",
 			newRule: networkingv1.NetworkPolicyEgressRule{
 				To: []networkingv1.NetworkPolicyPeer{{
-					NamespaceSelector: labelSelector(map[string]string{securityv1alpha1.NamespaceLabelKey: "team-a"}),
+					NamespaceSelector: labelSelector(map[string]string{corev1.LabelMetadataName: "team-a"}),
 					PodSelector:       labelSelector(map[string]string{"app": "frontend-v2"}),
 				}},
 				Ports: []networkingv1.NetworkPolicyPort{{Protocol: tcp, Port: portPtr(443)}},
@@ -130,11 +130,11 @@ func TestContainsRuleIngress(t *testing.T) {
 	tcp := protocolPtr(corev1.ProtocolTCP)
 
 	clientPeer := networkingv1.NetworkPolicyPeer{
-		NamespaceSelector: labelSelector(map[string]string{securityv1alpha1.NamespaceLabelKey: "client-ns"}),
+		NamespaceSelector: labelSelector(map[string]string{corev1.LabelMetadataName: "client-ns"}),
 		PodSelector:       labelSelector(map[string]string{"app": "client"}),
 	}
 	proxyPeer := networkingv1.NetworkPolicyPeer{
-		NamespaceSelector: labelSelector(map[string]string{securityv1alpha1.NamespaceLabelKey: "proxy-ns"}),
+		NamespaceSelector: labelSelector(map[string]string{corev1.LabelMetadataName: "proxy-ns"}),
 		PodSelector:       labelSelector(map[string]string{"app": "proxy"}),
 	}
 
@@ -317,7 +317,7 @@ func TestPolicyPeerEqual(t *testing.T) {
 		{
 			name: "matches selectors with expression order differences",
 			a: networkingv1.NetworkPolicyPeer{
-				NamespaceSelector: labelSelector(map[string]string{securityv1alpha1.NamespaceLabelKey: "ns-a"}),
+				NamespaceSelector: labelSelector(map[string]string{corev1.LabelMetadataName: "ns-a"}),
 				PodSelector: &metav1.LabelSelector{
 					MatchLabels: map[string]string{"app": "frontend"},
 					MatchExpressions: []metav1.LabelSelectorRequirement{{
@@ -329,7 +329,7 @@ func TestPolicyPeerEqual(t *testing.T) {
 				IPBlock: &networkingv1.IPBlock{CIDR: "10.0.0.0/24", Except: []string{"10.0.0.8/32", "10.0.0.9/32"}},
 			},
 			b: networkingv1.NetworkPolicyPeer{
-				NamespaceSelector: labelSelector(map[string]string{securityv1alpha1.NamespaceLabelKey: "ns-a"}),
+				NamespaceSelector: labelSelector(map[string]string{corev1.LabelMetadataName: "ns-a"}),
 				PodSelector: &metav1.LabelSelector{
 					MatchLabels: map[string]string{"app": "frontend"},
 					MatchExpressions: []metav1.LabelSelectorRequirement{{
@@ -345,10 +345,10 @@ func TestPolicyPeerEqual(t *testing.T) {
 		{
 			name: "does not match different namespace selector",
 			a: networkingv1.NetworkPolicyPeer{
-				NamespaceSelector: labelSelector(map[string]string{securityv1alpha1.NamespaceLabelKey: "ns-a"}),
+				NamespaceSelector: labelSelector(map[string]string{corev1.LabelMetadataName: "ns-a"}),
 			},
 			b: networkingv1.NetworkPolicyPeer{
-				NamespaceSelector: labelSelector(map[string]string{securityv1alpha1.NamespaceLabelKey: "ns-b"}),
+				NamespaceSelector: labelSelector(map[string]string{corev1.LabelMetadataName: "ns-b"}),
 			},
 			want: false,
 		},

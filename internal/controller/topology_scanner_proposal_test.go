@@ -78,7 +78,7 @@ func TestTopologyScannerReconcileProposal(t *testing.T) {
 					To: []networkingv1.NetworkPolicyPeer{
 						{
 							NamespaceSelector: &metav1.LabelSelector{
-								MatchLabels: map[string]string{securityv1alpha1.NamespaceLabelKey: defaultNamespace},
+								MatchLabels: map[string]string{corev1.LabelMetadataName: defaultNamespace},
 							},
 							PodSelector: &metav1.LabelSelector{
 								MatchLabels: peerLabels,
