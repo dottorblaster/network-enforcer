@@ -34,54 +34,29 @@ func newTestWNPreconciler(t *testing.T, objs ...client.Object) *WorkloadNetworkP
 func createWorkloadNetworkPolicy(
 	mode securityv1alpha1.WorkloadNetworkPolicyMode,
 ) *securityv1alpha1.WorkloadNetworkPolicy {
-	return &securityv1alpha1.WorkloadNetworkPolicy{
-		ObjectMeta: metav1.ObjectMeta{
-			Name:      "test-policy",
-			Namespace: "default",
-			UID:       types.UID("test-uid"),
-		},
-		Spec: securityv1alpha1.WorkloadNetworkPolicySpec{
-			Mode: mode,
-			PolicyTemplate: networkingv1.NetworkPolicySpec{
-				PodSelector: metav1.LabelSelector{
-					MatchLabels: map[string]string{"app": "web"},
-				},
-				PolicyTypes: []networkingv1.PolicyType{networkingv1.PolicyTypeIngress},
-				Ingress: []networkingv1.NetworkPolicyIngressRule{
-					{
-						From: []networkingv1.NetworkPolicyPeer{
-							{
-								PodSelector: &metav1.LabelSelector{
-									MatchLabels: map[string]string{"role": "frontend"},
-								},
-							},
-						},
+	wnp := newTestWNP("test-policy", "default")
+	wnp.UID = types.UID("test-uid")
+	wnp.Spec.Mode = mode
+	wnp.Spec.PolicyTemplate.PodSelector.MatchLabels = map[string]string{"app": "web"}
+	wnp.Spec.PolicyTemplate.PolicyTypes = []networkingv1.PolicyType{networkingv1.PolicyTypeIngress}
+	wnp.Spec.PolicyTemplate.Ingress = []networkingv1.NetworkPolicyIngressRule{
+		{
+			From: []networkingv1.NetworkPolicyPeer{
+				{
+					PodSelector: &metav1.LabelSelector{
+						MatchLabels: map[string]string{"role": "frontend"},
 					},
 				},
 			},
 		},
 	}
+	return wnp
 }
 
 func createAssociatedNetworkPolicy() *networkingv1.NetworkPolicy {
-	wnp := createWorkloadNetworkPolicy(securityv1alpha1.WorkloadNetworkPolicyModeProtect)
-	return &networkingv1.NetworkPolicy{
-		ObjectMeta: metav1.ObjectMeta{
-			Name:      wnp.Name,
-			Namespace: wnp.Namespace,
-			OwnerReferences: []metav1.OwnerReference{
-				{
-					APIVersion:         securityv1alpha1.GroupVersion.String(),
-					Kind:               "WorkloadNetworkPolicy",
-					Name:               wnp.Name,
-					UID:                wnp.UID,
-					Controller:         new(true),
-					BlockOwnerDeletion: new(true),
-				},
-			},
-		},
-		Spec: wnp.Spec.PolicyTemplate,
-	}
+	return newOwnedNetworkPolicy(
+		createWorkloadNetworkPolicy(securityv1alpha1.WorkloadNetworkPolicyModeProtect),
+	)
 }
 
 func TestWorkloadNetworkPolicyReconcilerProtect(t *testing.T) {

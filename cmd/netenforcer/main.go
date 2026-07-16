@@ -39,25 +39,35 @@ import (
 
 	securityv1alpha1 "github.com/rancher-sandbox/network-enforcer/api/v1alpha1"
 	"github.com/rancher-sandbox/network-enforcer/internal/controller"
+	"github.com/rancher-sandbox/network-enforcer/internal/grpcexporter"
 	"github.com/rancher-sandbox/network-enforcer/internal/receiver"
 	"github.com/rancher-sandbox/network-enforcer/internal/topology"
 	// +kubebuilder:scaffold:imports
 )
 
-const defaultDrainFlowsInterval = 30 * time.Second
+const (
+	defaultDrainFlowsInterval = 30 * time.Second
+	defaultStatusSyncInterval = 30 * time.Second
+)
 
 type config struct {
-	metricsAddr          string
-	metricsCertPath      string
-	metricsCertName      string
-	metricsCertKey       string
-	enableLeaderElection bool
-	probeAddr            string
-	secureMetrics        bool
-	enableHTTP2          bool
-	otlpPort             int
-	drainFlowsInterval   time.Duration
-	tlsOpts              []func(*tls.Config)
+	metricsAddr             string
+	metricsCertPath         string
+	metricsCertName         string
+	metricsCertKey          string
+	enableLeaderElection    bool
+	probeAddr               string
+	secureMetrics           bool
+	enableHTTP2             bool
+	otlpPort                int
+	drainFlowsInterval      time.Duration
+	statusSyncInterval      time.Duration
+	cniwatcherLabelSelector string
+	cniwatcherGRPCPort      int
+	cniwatcherNamespace     string
+	enableMTLS              bool
+	tlsCertDir              string
+	tlsOpts                 []func(*tls.Config)
 }
 
 func newControllerManager(conf *config) (manager.Manager, error) {
@@ -137,6 +147,29 @@ func run(logger *slog.Logger, conf *config) error {
 		return fmt.Errorf("unable to setup WorkloadNetworkPolicyProposal controller: %w", err)
 	}
 
+	statusSync, err := controller.NewWorkloadNetworkPolicyStatusSync(
+		mgr.GetClient(),
+		&controller.WorkloadNetworkPolicyStatusSyncConfig{
+			AgentPoolConf: grpcexporter.AgentClientPoolConfig{
+				AgentFactoryConfig: grpcexporter.AgentFactoryConfig{
+					MTLSEnabled: conf.enableMTLS,
+					CertDirPath: conf.tlsCertDir,
+					Port:        conf.cniwatcherGRPCPort,
+				},
+				Namespace:           conf.cniwatcherNamespace,
+				LabelSelectorString: conf.cniwatcherLabelSelector,
+				Logger:              logger,
+			},
+			UpdateInterval: conf.statusSyncInterval,
+		},
+	)
+	if err != nil {
+		return fmt.Errorf("unable to create WorkloadNetworkPolicyStatusSync: %w", err)
+	}
+	if err = mgr.Add(statusSync); err != nil {
+		return fmt.Errorf("unable to add WorkloadNetworkPolicyStatusSync runnable: %w", err)
+	}
+
 	// +kubebuilder:scaffold:builder
 
 	if err = mgr.AddHealthzCheck("healthz", healthz.Ping); err != nil {
@@ -174,6 +207,18 @@ func main() {
 	flag.IntVar(&conf.otlpPort, "otlp-port", 4317, "The port the OTLP gRPC receiver listens on.")
 	flag.DurationVar(&conf.drainFlowsInterval, "drain-flows-interval",
 		defaultDrainFlowsInterval, "The interval at which flows are drained.")
+	flag.DurationVar(&conf.statusSyncInterval, "status-sync-interval",
+		defaultStatusSyncInterval, "The interval at which WorkloadNetworkPolicy status is synced with cniwatcher pods.")
+	flag.StringVar(&conf.cniwatcherLabelSelector, "cniwatcher-label-selector",
+		grpcexporter.DefaultCniwatcherLabelSelectorString, "Label selector to discover cniwatcher pods.")
+	flag.IntVar(&conf.cniwatcherGRPCPort, "cniwatcher-grpc-port",
+		grpcexporter.DefaultAgentPort, "gRPC port of cniwatcher ScrapeViolations server.")
+	flag.StringVar(&conf.cniwatcherNamespace, "cniwatcher-namespace", "",
+		"Namespace where cniwatcher pods run (default: read from service account).")
+	flag.BoolVar(&conf.enableMTLS, "cniwatcher-mtls", false,
+		"Enable mTLS for gRPC connections to cniwatcher pods.")
+	flag.StringVar(&conf.tlsCertDir, "cniwatcher-tls-cert-dir", grpcexporter.DefaultCertDirPath,
+		"Directory containing TLS certificate and key for mTLS connections to cniwatcher pods.")
 	flag.Parse()
 
 	slogHandler := slog.NewJSONHandler(os.Stdout, &slog.HandlerOptions{Level: slog.LevelInfo})
