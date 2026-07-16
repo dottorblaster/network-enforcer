@@ -80,7 +80,7 @@ manifests: controller-gen ## Generate CRDs and RBAC.
 	echo '{{- end }}' >> charts/network-enforcer/templates/cniwatcher/role.yaml
 
 .PHONY: generate
-generate: manifests controller-gen generate-chart ## Generate code containing DeepCopy, DeepCopyInto, and DeepCopyObject method implementations.
+generate: manifests controller-gen generate-chart-values ## Generate code containing DeepCopy, DeepCopyInto, and DeepCopyObject method implementations.
 	"$(CONTROLLER_GEN)" object:headerFile="hack/boilerplate.go.txt" paths="./..."
 
 .PHONY: proto-agent
@@ -226,8 +226,8 @@ helm-values-schema-json: $(HELM_VALUES_SCHEMA_JSON) ## Download helm-values-sche
 $(HELM_VALUES_SCHEMA_JSON): $(LOCALBIN)
 	$(call go-install-tool,$(HELM_VALUES_SCHEMA_JSON),github.com/losisin/helm-values-schema-json/v2,$(HELM_VALUES_SCHEMA_JSON_VERSION))
 
-.PHONY: generate-chart
-generate-chart: $(HELM_VALUES_SCHEMA_JSON)
+.PHONY: generate-chart-values
+generate-chart-values: $(HELM_VALUES_SCHEMA_JSON)
 	$(HELM_VALUES_SCHEMA_JSON) --no-additional-properties \
 		--values charts/network-enforcer/values.yaml \
 		--output charts/network-enforcer/values.schema.json
