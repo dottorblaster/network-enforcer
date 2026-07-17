@@ -20,7 +20,7 @@ SHELL = /usr/bin/env bash -o pipefail
 .SHELLFLAGS = -ec
 
 .PHONY: all
-all: build
+all: controller
 
 ##@ General
 
@@ -115,13 +115,9 @@ lint-config: golangci-lint ## Verify golangci-lint linter configuration
 
 ##@ Build
 
-.PHONY: build
-build: generate fmt vet ## Build manager binary.
-	go build -o bin/manager cmd/netenforcer/main.go
-
 .PHONY: controller
 controller: fmt ## Build controller binary.
-	CGO_ENABLED=0 GOOS=linux go build -o bin/controller cmd/netenforcer/main.go
+	CGO_ENABLED=0 GOOS=linux go build -o bin/controller ./cmd/controller
 
 .PHONY: cniwatcher
 cniwatcher: fmt vet ## Build cniwatcher binary.
@@ -129,7 +125,7 @@ cniwatcher: fmt vet ## Build cniwatcher binary.
 
 .PHONY: run
 run: generate fmt vet ## Run a controller from your host.
-	go run ./cmd/netenforcer/main.go
+	go run ./cmd/controller/main.go
 
 # If you wish to build the manager image targeting other platforms you can use the --platform flag.
 # (i.e. docker build --platform linux/arm64). However, you must enable docker buildKit for it.
