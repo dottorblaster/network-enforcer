@@ -20,7 +20,7 @@ SHELL = /usr/bin/env bash -o pipefail
 .SHELLFLAGS = -ec
 
 .PHONY: all
-all: build
+all: controller
 
 ##@ General
 
@@ -115,13 +115,9 @@ lint-config: golangci-lint ## Verify golangci-lint linter configuration
 
 ##@ Build
 
-.PHONY: build
-build: generate fmt vet ## Build manager binary.
-	go build -o bin/manager cmd/controller/main.go
-
 .PHONY: controller
 controller: fmt ## Build controller binary.
-	CGO_ENABLED=0 GOOS=linux go build -o bin/controller cmd/controller/main.go
+	CGO_ENABLED=0 GOOS=linux go build -o bin/controller ./cmd/controller
 
 .PHONY: cniwatcher
 cniwatcher: fmt vet ## Build cniwatcher binary.
