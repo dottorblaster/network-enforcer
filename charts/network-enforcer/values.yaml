@@ -38,6 +38,10 @@ controller:
 kubernetesClusterDomain: cluster.local
 imagePullSecrets: []
 
+# The original dependency name is needed for Helm v4 dependency processing.
+# @schema additionalProperties:true
+opentelemetry-ebpf-instrumentation: {}
+
 # Settings for opentelemetry-ebpf-instrumentation
 # @schema additionalProperties:true
 obi:

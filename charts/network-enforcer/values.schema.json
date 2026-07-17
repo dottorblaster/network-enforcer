@@ -375,6 +375,10 @@
                 }
             },
             "additionalProperties": true
+        },
+        "opentelemetry-ebpf-instrumentation": {
+            "type": "object",
+            "additionalProperties": true
         }
     },
     "additionalProperties": false
