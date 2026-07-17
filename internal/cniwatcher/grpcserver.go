@@ -9,7 +9,7 @@ import (
 	"time"
 
 	"github.com/rancher-sandbox/network-enforcer/internal/violationbuf"
-	pb "github.com/rancher-sandbox/network-enforcer/proto/agent/v1"
+	agentv1 "github.com/rancher-sandbox/network-enforcer/proto/agent/v1"
 	"google.golang.org/grpc"
 	"google.golang.org/protobuf/types/known/timestamppb"
 )
@@ -25,7 +25,7 @@ type GRPCServerConfig struct {
 }
 
 type GRPCServer struct {
-	pb.UnimplementedNetworkAgentServer
+	agentv1.UnimplementedNetworkAgentServer
 
 	logger          *slog.Logger
 	violationBuffer *violationbuf.Buffer
@@ -43,21 +43,21 @@ func NewGRPCServer(logger *slog.Logger, buffer *violationbuf.Buffer) *GRPCServer
 // Returns an empty response (not an error) when the buffer is empty.
 func (s *GRPCServer) ScrapeViolations(
 	ctx context.Context,
-	_ *pb.ScrapeViolationsRequest,
-) (*pb.ScrapeViolationsResponse, error) {
+	_ *agentv1.ScrapeViolationsRequest,
+) (*agentv1.ScrapeViolationsResponse, error) {
 	if s.violationBuffer == nil {
 		s.logger.WarnContext(ctx, "Violation buffer is nil, returning empty response")
-		return &pb.ScrapeViolationsResponse{}, nil
+		return &agentv1.ScrapeViolationsResponse{}, nil
 	}
 
 	records := s.violationBuffer.Drain()
 
-	out := &pb.ScrapeViolationsResponse{
-		Violations: make([]*pb.ViolationRecord, 0, len(records)),
+	out := &agentv1.ScrapeViolationsResponse{
+		Violations: make([]*agentv1.ViolationRecord, 0, len(records)),
 	}
 
 	for _, rec := range records {
-		out.Violations = append(out.Violations, &pb.ViolationRecord{
+		out.Violations = append(out.Violations, &agentv1.ViolationRecord{
 			Timestamp:              timestamppb.New(rec.Timestamp),
 			NodeName:               rec.NodeName,
 			Direction:              rec.Direction,
@@ -110,7 +110,7 @@ func StartGRPCServer(
 	}
 
 	grpcSrv := grpc.NewServer()
-	pb.RegisterNetworkAgentServer(grpcSrv, NewGRPCServer(logger, buffer))
+	agentv1.RegisterNetworkAgentServer(grpcSrv, NewGRPCServer(logger, buffer))
 
 	logger.InfoContext(ctx, "Starting gRPC ScrapeViolations server", "addr", addr)
 

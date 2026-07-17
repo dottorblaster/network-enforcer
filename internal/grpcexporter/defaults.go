@@ -1,0 +1,14 @@
+package grpcexporter
+
+const (
+	// DefaultCniwatcherLabelSelectorString is the default label selector used to
+	// discover cniwatcher pods across the cluster.
+	DefaultCniwatcherLabelSelectorString = "app.kubernetes.io/component=cniwatcher"
+
+	// DefaultAgentPort is the gRPC port that cniwatcher serves ScrapeViolations on.
+	DefaultAgentPort = 50051
+
+	// DefaultCertDirPath is the default directory for TLS certificates when mTLS
+	// is enabled.
+	DefaultCertDirPath = "/etc/network-enforcer/certs"
+)
