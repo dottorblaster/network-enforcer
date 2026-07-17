@@ -1,0 +1,61 @@
+name: Update OpenTelemetry eBPF instrumentation chart version
+
+pipelineid: opentelemetry-ebpf-instrumentation/version
+
+sources:
+  obi:
+    name: Get latest opentelemetry-ebpf-instrumentation chart version
+    kind: helmchart
+    spec:
+      url: https://open-telemetry.github.io/opentelemetry-helm-charts
+      name: opentelemetry-ebpf-instrumentation
+      versionfilter:
+        # Only stable semver releases, take the highest one
+        kind: semver
+        pattern: "*"
+
+targets:
+  chart-dependency:
+    name: 'deps(obi): update opentelemetry-ebpf-instrumentation chart to {{ source "obi" }}'
+    sourceid: obi
+    kind: yaml
+    scmid: default
+    spec:
+      file: charts/network-enforcer/Chart.yaml
+      key: $.dependencies[0].version
+
+actions:
+  default:
+    title: 'deps(obi): update opentelemetry-ebpf-instrumentation to {{ source "obi" }}'
+    kind: github/pullrequest
+    scmid: default
+    spec:
+      automerge: false
+      mergemethod: squash
+      description: |
+        Automatic opentelemetry-ebpf-instrumentation Helm chart {{ source "obi" }} update.
+        This PR has been created by the automation used to automatically update the opentelemetry-ebpf-instrumentation dependency version in the network-enforcer Helm chart.
+        REMEMBER IF YOU WANT TO MERGE IN A SINGLE COMMIT CHANGES AND VERSION BUMP, YOU MUST SQUASH THE COMMIT BEFORE MERGING THIS PR!
+      draft: false
+      labels:
+        - "chore"
+        - "dependencies"
+
+scms:
+  default:
+    kind: github
+    spec:
+      user: "{{ .github.author }}"
+      email: "{{ .github.email }}"
+      owner: "{{ requiredEnv .github.owner }}"
+      repository: "network-enforcer"
+      token: "{{ requiredEnv .github.token }}"
+      username: "{{ requiredEnv .github.user }}"
+      branch: "{{ .github.branch }}"
+      commitusingapi: true
+      commitmessage:
+        type: "chore"
+        scope: deps
+        title: "update opentelemetry-ebpf-instrumentation chart version"
+        hidecredit: true
+        footers: "Signed-off-by: NetworkEnforcer bot <network-enforcer-bot@users.noreply.github.com>"
