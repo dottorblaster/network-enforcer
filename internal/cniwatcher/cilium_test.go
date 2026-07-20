@@ -28,8 +28,13 @@ func TestNewCiliumWatcher(t *testing.T) {
 	}{
 		{
 			name:             "Default Hubble endpoint",
-			connEndpoint:     "unix:///var/run/cilium/hubble.sock",
+			connEndpoint:     types.DefaultHubbleEndpoint,
 			expectedEndpoint: types.DefaultHubbleEndpoint,
+		},
+		{
+			name:             "Custom endpoint",
+			connEndpoint:     "unix:///tmp/hubble.sock",
+			expectedEndpoint: "unix:///tmp/hubble.sock",
 		},
 	}
 
@@ -37,17 +42,11 @@ func TestNewCiliumWatcher(t *testing.T) {
 		t.Run(tt.name, func(t *testing.T) {
 			fakeClient := fake.NewClientBuilder().Build()
 			log := slog.New(slog.NewTextHandler(os.Stdout, &slog.HandlerOptions{Level: slog.LevelInfo}))
-			otelService := otel.NewOpenTelemetryService(otel.OpenTelemetryConfig{
-				Ctx:               t.Context(),
-				Log:               log,
-				CollectorEndpoint: "localhost:4317",
-			})
 
 			watcher := cniwatcher.Watcher{
-				Ctx:         t.Context(),
-				Client:      fakeClient,
-				Log:         log,
-				OtelService: otelService,
+				Ctx:    t.Context(),
+				Client: fakeClient,
+				Log:    log,
 			}
 
 			ciliumWatcher, err := cniwatcher.NewCiliumWatcher(watcher, tt.connEndpoint)
@@ -251,38 +250,10 @@ func TestCiliumWatcher_WatchFlows(t *testing.T) {
 }
 
 func TestCiliumWatcher_Shutdown(t *testing.T) {
-	tests := []struct {
-		name    string
-		wantErr bool
-	}{
-		{
-			name:    "Successful shutdown",
-			wantErr: false,
+	watcher := &cniwatcher.CiliumWatcher{
+		Watcher: cniwatcher.Watcher{
+			Log: slog.New(slog.NewTextHandler(os.Stdout, &slog.HandlerOptions{Level: slog.LevelError})),
 		},
 	}
-
-	for _, tt := range tests {
-		t.Run(tt.name, func(t *testing.T) {
-			log := slog.New(slog.NewTextHandler(os.Stdout, &slog.HandlerOptions{Level: slog.LevelInfo}))
-			otelService := otel.NewOpenTelemetryService(otel.OpenTelemetryConfig{
-				Ctx:               t.Context(),
-				Log:               log,
-				CollectorEndpoint: "localhost:4317",
-			})
-
-			watcher := &cniwatcher.CiliumWatcher{
-				Watcher: cniwatcher.Watcher{
-					Log:         log,
-					OtelService: otelService,
-				},
-			}
-
-			err := watcher.Shutdown()
-			if tt.wantErr {
-				assert.Error(t, err)
-			} else {
-				assert.NoError(t, err)
-			}
-		})
-	}
+	assert.NoError(t, watcher.Shutdown())
 }

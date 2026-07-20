@@ -11,7 +11,6 @@ import (
 
 	"github.com/rancher-sandbox/network-enforcer/internal/cniwatcher"
 	pb "github.com/rancher-sandbox/network-enforcer/internal/cniwatcher/calico/goldmane"
-	"github.com/rancher-sandbox/network-enforcer/internal/otel"
 	"github.com/rancher-sandbox/network-enforcer/internal/types"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
@@ -27,8 +26,13 @@ func TestNewCalicoWatcher(t *testing.T) {
 	}{
 		{
 			name:             "Default Goldmane endpoint",
-			connEndpoint:     "goldmane.calico-system.svc:7443",
+			connEndpoint:     types.DefaultGoldmaneEndpoint,
 			expectedEndpoint: types.DefaultGoldmaneEndpoint,
+		},
+		{
+			name:             "Custom endpoint",
+			connEndpoint:     "goldmane.custom.svc:7443",
+			expectedEndpoint: "goldmane.custom.svc:7443",
 		},
 	}
 
@@ -36,17 +40,11 @@ func TestNewCalicoWatcher(t *testing.T) {
 		t.Run(tt.name, func(t *testing.T) {
 			fakeClient := fake.NewClientBuilder().Build()
 			log := slog.New(slog.NewTextHandler(os.Stdout, &slog.HandlerOptions{Level: slog.LevelInfo}))
-			otelService := otel.NewOpenTelemetryService(otel.OpenTelemetryConfig{
-				Ctx:               t.Context(),
-				Log:               log,
-				CollectorEndpoint: "localhost:4317",
-			})
 
 			watcher := cniwatcher.Watcher{
-				Ctx:         t.Context(),
-				Client:      fakeClient,
-				Log:         log,
-				OtelService: otelService,
+				Ctx:    t.Context(),
+				Client: fakeClient,
+				Log:    log,
 			}
 
 			calicoWatcher, err := cniwatcher.NewCalicoWatcher(watcher, tt.connEndpoint)
@@ -94,11 +92,6 @@ func TestCalicoWatcher_ConnectToGoldmane(t *testing.T) {
 
 	clientset := fake.NewClientBuilder().Build()
 	log := slog.New(slog.NewTextHandler(os.Stdout, &slog.HandlerOptions{Level: slog.LevelInfo}))
-	otelService := otel.NewOpenTelemetryService(otel.OpenTelemetryConfig{
-		Ctx:               t.Context(),
-		Log:               log,
-		CollectorEndpoint: "localhost:4317",
-	})
 
 	tests := []struct {
 		name           string
@@ -130,9 +123,8 @@ func TestCalicoWatcher_ConnectToGoldmane(t *testing.T) {
 		t.Run(tt.name, func(t *testing.T) {
 			watcher := &cniwatcher.CalicoWatcher{
 				Watcher: cniwatcher.Watcher{
-					Client:      clientset,
-					Log:         log,
-					OtelService: otelService,
+					Client: clientset,
+					Log:    log,
 				},
 			}
 
@@ -193,17 +185,11 @@ func (m *MockStreamClient) Recv() (*pb.FlowResult, error) {
 func TestCalicoWatcher_WatchFlows(t *testing.T) {
 	clientset := fake.NewClientBuilder().Build()
 	log := slog.New(slog.NewTextHandler(os.Stdout, &slog.HandlerOptions{Level: slog.LevelInfo}))
-	otelService := otel.NewOpenTelemetryService(otel.OpenTelemetryConfig{
-		Ctx:               t.Context(),
-		Log:               log,
-		CollectorEndpoint: "localhost:4317",
-	})
 
 	watcher := &cniwatcher.CalicoWatcher{
 		Watcher: cniwatcher.Watcher{
-			Client:      clientset,
-			Log:         log,
-			OtelService: otelService,
+			Client: clientset,
+			Log:    log,
 		},
 	}
 
@@ -271,38 +257,10 @@ func TestCalicoWatcher_WatchFlows(t *testing.T) {
 }
 
 func TestCalicoWatcher_Shutdown(t *testing.T) {
-	tests := []struct {
-		name    string
-		wantErr bool
-	}{
-		{
-			name:    "Successful shutdown",
-			wantErr: false,
+	watcher := &cniwatcher.CalicoWatcher{
+		Watcher: cniwatcher.Watcher{
+			Log: slog.New(slog.NewTextHandler(os.Stdout, &slog.HandlerOptions{Level: slog.LevelError})),
 		},
 	}
-
-	for _, tt := range tests {
-		t.Run(tt.name, func(t *testing.T) {
-			log := slog.New(slog.NewTextHandler(os.Stdout, &slog.HandlerOptions{Level: slog.LevelInfo}))
-			otelService := otel.NewOpenTelemetryService(otel.OpenTelemetryConfig{
-				Ctx:               t.Context(),
-				Log:               log,
-				CollectorEndpoint: "localhost:4317",
-			})
-
-			watcher := &cniwatcher.CalicoWatcher{
-				Watcher: cniwatcher.Watcher{
-					Log:         log,
-					OtelService: otelService,
-				},
-			}
-
-			err := watcher.Shutdown()
-			if tt.wantErr {
-				assert.Error(t, err)
-			} else {
-				assert.NoError(t, err)
-			}
-		})
-	}
+	assert.NoError(t, watcher.Shutdown())
 }

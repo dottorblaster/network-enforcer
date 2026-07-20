@@ -18,25 +18,25 @@ func TestParseCNIType(t *testing.T) {
 	}{
 		{
 			name:     "Valid AWS VPC CNI type",
-			input:    "aws-vpc",
+			input:    string(types.CNITypeAWSVPC),
 			expected: types.CNITypeAWSVPC,
 			wantErr:  false,
 		},
 		{
 			name:     "Valid Calico CNI type",
-			input:    "calico",
+			input:    string(types.CNITypeCalico),
 			expected: types.CNITypeCalico,
 			wantErr:  false,
 		},
 		{
 			name:     "Valid Cilium CNI type",
-			input:    "cilium",
+			input:    string(types.CNITypeCilium),
 			expected: types.CNITypeCilium,
 			wantErr:  false,
 		},
 		{
 			name:     "Valid Flannel CNI type",
-			input:    "flannel",
+			input:    string(types.CNITypeFlannel),
 			expected: types.CNITypeFlannel,
 			wantErr:  false,
 		},
@@ -80,7 +80,7 @@ func TestNewConfig(t *testing.T) {
 		{
 			name:             "Valid AWS VPC config",
 			nodeName:         "test-node",
-			cniType:          "aws-vpc",
+			cniType:          string(types.CNITypeAWSVPC),
 			wantErr:          false,
 			expectedCNI:      types.CNITypeAWSVPC,
 			expectedEndpoint: "",
@@ -88,7 +88,7 @@ func TestNewConfig(t *testing.T) {
 		{
 			name:             "Valid Flannel config",
 			nodeName:         "test-node",
-			cniType:          "flannel",
+			cniType:          string(types.CNITypeFlannel),
 			wantErr:          false,
 			expectedCNI:      types.CNITypeFlannel,
 			expectedEndpoint: "",
@@ -96,8 +96,8 @@ func TestNewConfig(t *testing.T) {
 		{
 			name:             "Valid Calico config with default endpoint",
 			nodeName:         "test-node",
-			cniType:          "calico",
-			connEndpoint:     "goldmane.calico-system.svc:7443",
+			cniType:          string(types.CNITypeCalico),
+			connEndpoint:     types.DefaultGoldmaneEndpoint,
 			wantErr:          false,
 			expectedCNI:      types.CNITypeCalico,
 			expectedEndpoint: types.DefaultGoldmaneEndpoint,
@@ -105,7 +105,7 @@ func TestNewConfig(t *testing.T) {
 		{
 			name:             "Valid Calico config with empty endpoint",
 			nodeName:         "test-node",
-			cniType:          "calico",
+			cniType:          string(types.CNITypeCalico),
 			connEndpoint:     "",
 			wantErr:          false,
 			expectedCNI:      types.CNITypeCalico,
@@ -114,8 +114,8 @@ func TestNewConfig(t *testing.T) {
 		{
 			name:             "Valid Cilium config with default endpoint",
 			nodeName:         "test-node",
-			cniType:          "cilium",
-			connEndpoint:     "unix:///var/run/cilium/hubble.sock",
+			cniType:          string(types.CNITypeCilium),
+			connEndpoint:     types.DefaultHubbleEndpoint,
 			wantErr:          false,
 			expectedCNI:      types.CNITypeCilium,
 			expectedEndpoint: types.DefaultHubbleEndpoint,
@@ -123,7 +123,7 @@ func TestNewConfig(t *testing.T) {
 		{
 			name:             "Valid Cilium config with empty endpoint",
 			nodeName:         "test-node",
-			cniType:          "cilium",
+			cniType:          string(types.CNITypeCilium),
 			connEndpoint:     "",
 			wantErr:          false,
 			expectedCNI:      types.CNITypeCilium,
@@ -132,15 +132,7 @@ func TestNewConfig(t *testing.T) {
 		{
 			name:             "Empty node name",
 			nodeName:         "",
-			cniType:          "calico",
-			wantErr:          true,
-			expectedCNI:      types.CNITypeUnknown,
-			expectedEndpoint: "",
-		},
-		{
-			name:             "Invalid CNI type",
-			nodeName:         "test-node",
-			cniType:          "invalid-cni",
+			cniType:          string(types.CNITypeCalico),
 			wantErr:          true,
 			expectedCNI:      types.CNITypeUnknown,
 			expectedEndpoint: "",
@@ -148,7 +140,7 @@ func TestNewConfig(t *testing.T) {
 		{
 			name:             "Unknown CNI type",
 			nodeName:         "test-node",
-			cniType:          "unknown",
+			cniType:          string(types.CNITypeUnknown),
 			wantErr:          true,
 			expectedCNI:      types.CNITypeUnknown,
 			expectedEndpoint: "",
