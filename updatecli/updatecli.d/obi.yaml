@@ -28,10 +28,14 @@ targets:
     kind: shell
     scmid: default
     disablesourceinput: true
+    dependson:
+      - chart-dependency
+    dependsonchange: true
     spec:
       command: 'helm dependency update charts/network-enforcer'
       environments:
         - name: PATH
+        - name: HOME
 
 actions:
   default:
