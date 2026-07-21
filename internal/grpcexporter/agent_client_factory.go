@@ -12,18 +12,17 @@ import (
 )
 
 // AgentClientFactory creates gRPC AgentClient instances that connect to
-// cniwatcher pods on a configurable port, optionally using mTLS.
+// cniwatcher pods on a configurable port. When a cert dir is configured it
+// dials with mTLS, otherwise it uses an insecure connection.
 type AgentClientFactory struct {
-	port        string
-	mTLSEnabled bool
-	certDir     string
+	port    string
+	certDir string
 }
 
 // AgentFactoryConfig holds the configuration for the AgentClientFactory.
 type AgentFactoryConfig struct {
-	// MTLSEnabled enables mutual TLS when dialing cniwatcher pods.
-	MTLSEnabled bool
-	// CertDirPath is the directory containing tls.crt, tls.key, and ca.crt.
+	// CertDirPath is the directory containing tls.crt, tls.key, and ca.crt. When
+	// set, connections use mTLS; when empty they are insecure.
 	CertDirPath string
 	// Port is the gRPC port of the cniwatcher ScrapeViolations server.
 	Port int
@@ -35,25 +34,21 @@ func NewAgentClientFactory(conf *AgentFactoryConfig) (*AgentClientFactory, error
 		return nil, fmt.Errorf("invalid gRPC port: %d", conf.Port)
 	}
 
-	var certDir string
-	if conf.MTLSEnabled {
+	if conf.CertDirPath != "" {
 		if err := tlsutil.ValidateCertDir(conf.CertDirPath); err != nil {
 			return nil, fmt.Errorf("invalid certificate directory %q: %w", conf.CertDirPath, err)
 		}
-		certDir = conf.CertDirPath
 	}
 	return &AgentClientFactory{
-		port:        strconv.Itoa(conf.Port),
-		certDir:     certDir,
-		mTLSEnabled: conf.MTLSEnabled,
+		port:    strconv.Itoa(conf.Port),
+		certDir: conf.CertDirPath,
 	}, nil
 }
 
-// getConnCredentials returns gRPC transport credentials based on the
-// factory's TLS configuration. When mTLS is disabled it returns insecure
-// credentials.
+// getConnCredentials returns gRPC transport credentials based on the factory's
+// TLS configuration. Without a cert dir it returns insecure credentials.
 func (f *AgentClientFactory) getConnCredentials(serverName string) (credentials.TransportCredentials, error) {
-	if !f.mTLSEnabled {
+	if f.certDir == "" {
 		return insecure.NewCredentials(), nil
 	}
 	return tlsutil.ClientCredentials(f.certDir, serverName)

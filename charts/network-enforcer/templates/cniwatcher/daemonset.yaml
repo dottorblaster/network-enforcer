@@ -29,8 +29,8 @@ spec:
           {{- $cni := .Values.cniwatcher.cniType }}
           securityContext: {{- toYaml .Values.cniwatcher.containerSecurityContext | nindent 12 }}
           args:
-            - --cniwatcher-grpc-port={{ .Values.cniwatcher.grpcPort | default 50051 }}
-            - --cniwatcher-tls-cert-dir={{ include "network-enforcer.cniwatcher.certDir" . }}
+            - --grpc-port={{ .Values.cniwatcher.grpcPort | default 50051 }}
+            - --grpc-mtls-cert-dir={{ include "network-enforcer.cniwatcher.certDir" . }}
           ports:
             - name: grpc-scrape
               containerPort: {{ .Values.cniwatcher.grpcPort | default 50051 }}

@@ -33,7 +33,6 @@ spec:
       - args:
         {{- toYaml .Values.controller.args | nindent 8 }}
         - --drain-flows-interval={{ .Values.controller.drainFlowsInterval }}
-        - --cniwatcher-mtls=true
         - --cniwatcher-tls-cert-dir={{ include "network-enforcer.cniwatcher.certDir" . }}
         command:
         - /controller

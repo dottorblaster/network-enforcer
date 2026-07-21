@@ -6,7 +6,6 @@ import (
 	"log/slog"
 	"os"
 	"os/signal"
-	"strconv"
 	"syscall"
 	"time"
 
@@ -20,32 +19,17 @@ import (
 const otelShutdownTimeout = 10 * time.Second
 
 func grpcConfigFromFlags() cniwatcher.GRPCServerConfig {
-	// Read environment variables as defaults (before flag.Parse) so explicit CLI
-	// flags take precedence. This avoids the uncommon precedence of env vars
-	// overriding flags that the user explicitly passed.
-	defaultPort := cniwatcher.DefaultGRPCPort
-	if portStr := os.Getenv("CNIWATCHER_GRPC_PORT"); portStr != "" {
-		if p, parseErr := strconv.Atoi(portStr); parseErr == nil && p > 0 {
-			defaultPort = p
-		}
-	}
-	defaultCertDir := os.Getenv("CNIWATCHER_TLS_CERT_DIR")
-
-	port := flag.Int("cniwatcher-grpc-port", defaultPort,
+	port := flag.Int("grpc-port", cniwatcher.DefaultGRPCPort,
 		"Port for the gRPC ScrapeViolations server.")
-	tlsCertDir := flag.String("cniwatcher-tls-cert-dir", defaultCertDir,
+	certDir := flag.String("grpc-mtls-cert-dir", "",
 		"Directory containing tls.crt, tls.key, and ca.crt for mTLS. "+
 			"When empty, the gRPC server runs in insecure mode (no TLS).")
 	flag.Parse()
 
-	cfg := cniwatcher.GRPCServerConfig{
-		Port: *port,
+	return cniwatcher.GRPCServerConfig{
+		Port:    *port,
+		CertDir: *certDir,
 	}
-	if *tlsCertDir != "" {
-		cfg.MTLSEnabled = true
-		cfg.CertDir = *tlsCertDir
-	}
-	return cfg
 }
 
 func main() {
