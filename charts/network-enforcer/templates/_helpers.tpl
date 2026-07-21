@@ -62,6 +62,21 @@ Set OTEL endpoint (defaults to controller OTLP service in release namespace)
 {{- end -}}
 
 {{/*
+Certificate helpers for cniwatcher mTLS.
+The CA issuer and CA secret share a name; the cert-manager CSI driver mints a
+per-pod leaf certificate from the CA issuer at mount time.
+*/}}
+{{- define "network-enforcer.caIssuerName" -}}
+{{ include "network-enforcer.fullname" . }}-ca
+{{- end -}}
+{{- define "network-enforcer.caSecretName" -}}
+{{ include "network-enforcer.fullname" . }}-ca
+{{- end -}}
+{{- define "network-enforcer.cniwatcher.certDir" -}}
+/etc/network-enforcer/certs
+{{- end -}}
+
+{{/*
 CNI-specific volume mounts for cniwatcher
 */}}
 {{- define "network-enforcer.cniwatcher.volumeMounts" -}}
@@ -81,11 +96,9 @@ CNI-specific volume mounts for cniwatcher
   mountPath: /var/log/aws-routed-eni
   readOnly: true
 {{- end }}
-{{- if .Values.cniwatcher.mtls.enabled }}
 - name: cniwatcher-mtls-certs
-  mountPath: {{ .Values.cniwatcher.mtls.certDir }}
+  mountPath: {{ include "network-enforcer.cniwatcher.certDir" . }}
   readOnly: true
-{{- end }}
 {{- end -}}
 
 {{/*
@@ -111,18 +124,12 @@ CNI-specific volumes for cniwatcher
     path: /var/log/aws-routed-eni
     type: Directory
 {{- end }}
-{{- if .Values.cniwatcher.mtls.enabled }}
 - name: cniwatcher-mtls-certs
-  projected:
-    sources:
-      - secret:
-          name: cniwatcher-mtls-certs
-          items:
-            - key: tls.crt
-              path: tls.crt
-            - key: tls.key
-              path: tls.key
-            - key: ca.crt
-              path: ca.crt
-{{- end }}
+  csi:
+    driver: "csi.cert-manager.io"
+    readOnly: true
+    volumeAttributes:
+      csi.cert-manager.io/issuer-name: {{ include "network-enforcer.caIssuerName" . }}
+      csi.cert-manager.io/issuer-kind: Issuer
+      csi.cert-manager.io/dns-names: ${POD_NAME}.${POD_NAMESPACE}
 {{- end -}}
