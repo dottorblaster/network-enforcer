@@ -51,20 +51,25 @@ app.kubernetes.io/instance: {{ .Release.Name }}
 {{- end }}
 
 {{/*
+DNS name of the controller OTLP service; also a SAN on the controller cert.
+*/}}
+{{- define "network-enforcer.controller.otlpServiceDNS" -}}
+{{ include "network-enforcer.fullname" . }}-otlp.{{ .Release.Namespace }}.svc.cluster.local
+{{- end -}}
+
+{{/*
 Set OTEL endpoint (defaults to controller OTLP service in release namespace)
 */}}
 {{- define "network-enforcer.cniwatcher.otelEndpoint" -}}
 {{- if .Values.cniwatcher.otelEndpoint -}}
 {{- .Values.cniwatcher.otelEndpoint -}}
 {{- else -}}
-{{- printf "%s-otlp.%s.svc.cluster.local:4317" (include "network-enforcer.fullname" .) .Release.Namespace -}}
+{{- printf "%s:4317" (include "network-enforcer.controller.otlpServiceDNS" .) -}}
 {{- end -}}
 {{- end -}}
 
 {{/*
-Certificate helpers for cniwatcher mTLS.
-The CA issuer and CA secret share a name; the cert-manager CSI driver mints a
-per-pod leaf certificate from the CA issuer at mount time.
+Certificate helpers for cniwatcher mTLS (CA issuer and secret share a name).
 */}}
 {{- define "network-enforcer.caIssuerName" -}}
 {{ include "network-enforcer.fullname" . }}-ca

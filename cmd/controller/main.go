@@ -121,7 +121,12 @@ func run(logger *slog.Logger, conf *config) error {
 
 	store := topology.NewStore()
 
-	receiver := receiver.NewReceiver(store, conf.otlpPort, logger)
+	// The OTLP receiver reuses the pod cert dir, gated on the same mTLS toggle.
+	otlpCertDir := ""
+	if conf.enableMTLS {
+		otlpCertDir = conf.tlsCertDir
+	}
+	receiver := receiver.NewReceiver(store, conf.otlpPort, otlpCertDir, logger)
 	err = mgr.Add(receiver)
 	if err != nil {
 		return fmt.Errorf("unable to add OTLP receiver to manager: %w", err)

@@ -75,11 +75,9 @@ cniwatcher:
   # Port for the gRPC ScrapeViolations server. The controller scrapes violations
   # from each cniwatcher pod on this port.
   grpcPort: 50051
-  # The gRPC ScrapeViolations server always runs with mutual TLS. Certificates
-  # are issued per-pod by cert-manager via the cert-manager CSI driver
-  # (csi.cert-manager.io), which must be installed in the cluster along with
-  # cert-manager itself. The chart provisions a self-signed CA Issuer that signs
-  # both the cniwatcher (server) and controller (client) certificates.
+  # mTLS is always on: certificates are issued per-pod by cert-manager via the
+  # CSI driver (csi.cert-manager.io), so both cert-manager and that driver must
+  # be installed in the cluster.
   podSecurityContext:
     runAsNonRoot: true # this should be false for aws-vpc
     seccompProfile:

@@ -59,6 +59,8 @@ func main() {
 		Ctx:               ctx,
 		Log:               logger,
 		CollectorEndpoint: os.Getenv("OTEL_EXPORTER_OTLP_ENDPOINT"),
+		// Reuse the pod's ScrapeViolations cert as the OTLP client cert.
+		CertDir: grpcConfig.CertDir,
 	}
 	otelService := otel.NewOpenTelemetryService(otelCfg)
 	if err := otelService.Start(); err != nil {
