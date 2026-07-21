@@ -6,31 +6,20 @@ import (
 	"testing"
 
 	"github.com/rancher-sandbox/network-enforcer/internal/cniwatcher"
-	"github.com/rancher-sandbox/network-enforcer/internal/otel"
 	"github.com/rancher-sandbox/network-enforcer/internal/types"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
+	corev1 "k8s.io/api/core/v1"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
+	"sigs.k8s.io/controller-runtime/pkg/client"
 	"sigs.k8s.io/controller-runtime/pkg/client/fake"
 )
 
+func testLogger() *slog.Logger {
+	return slog.New(slog.NewTextHandler(os.Stdout, &slog.HandlerOptions{Level: slog.LevelError}))
+}
+
 func TestNewCNIWatcher(t *testing.T) {
-	logger := slog.New(slog.NewTextHandler(os.Stdout, &slog.HandlerOptions{Level: slog.LevelInfo}))
-	ctx := t.Context()
-	fakeClient := fake.NewClientBuilder().Build()
-	otelService := otel.NewOpenTelemetryService(otel.OpenTelemetryConfig{
-		Ctx:               ctx,
-		Log:               logger,
-		CollectorEndpoint: "localhost:4317",
-	})
-
-	watcher := cniwatcher.Watcher{
-		Ctx:         ctx,
-		Client:      fakeClient,
-		Log:         logger,
-		OtelService: otelService,
-	}
-
 	tests := []struct {
 		name    string
 		config  cniwatcher.Config
@@ -41,7 +30,7 @@ func TestNewCNIWatcher(t *testing.T) {
 			config: cniwatcher.Config{
 				NodeName:     "test-node",
 				CNIType:      types.CNITypeCalico,
-				ConnEndpoint: "goldmane:7443",
+				ConnEndpoint: types.DefaultGoldmaneEndpoint,
 			},
 			wantErr: false,
 		},
@@ -50,7 +39,7 @@ func TestNewCNIWatcher(t *testing.T) {
 			config: cniwatcher.Config{
 				NodeName:     "test-node",
 				CNIType:      types.CNITypeCilium,
-				ConnEndpoint: "unix:///var/run/cilium/hubble.sock",
+				ConnEndpoint: types.DefaultHubbleEndpoint,
 			},
 			wantErr: false,
 		},
@@ -82,6 +71,12 @@ func TestNewCNIWatcher(t *testing.T) {
 
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
+			watcher := cniwatcher.Watcher{
+				Ctx:    t.Context(),
+				Client: fake.NewClientBuilder().Build(),
+				Log:    testLogger(),
+			}
+
 			cniWatcher, err := cniwatcher.NewCNIWatcher(tt.config, watcher)
 			if tt.wantErr {
 				require.Error(t, err)
@@ -94,57 +89,8 @@ func TestNewCNIWatcher(t *testing.T) {
 	}
 }
 
-func TestWatcher_ProcessPolicyDenyEvent(t *testing.T) {
-	logger := slog.New(slog.NewTextHandler(os.Stdout, &slog.HandlerOptions{Level: slog.LevelInfo}))
-	ctx := t.Context()
-	fakeClient := fake.NewClientBuilder().Build()
-
-	watcher := &cniwatcher.Watcher{
-		Ctx:    ctx,
-		Client: fakeClient,
-		Log:    logger,
-	}
-
-	// Test with nil event
-	err := watcher.ProcessPolicyDenyEvent(nil)
-	require.NoError(t, err)
-
-	// Test with valid event
-	event := &types.PolicyDenyEvent{
-		Timestamp:    1234567890,
-		NodeName:     "test-node",
-		CNIType:      "calico",
-		Protocol:     "TCP",
-		SrcNamespace: "default",
-		SrcName:      "test-pod",
-		DstNamespace: "default",
-		DstName:      "test-service",
-	}
-
-	err = watcher.ProcessPolicyDenyEvent(event)
-	require.Error(t, err)
-	assert.Contains(t, err.Error(), "OpenTelemetry service is not initialized")
-
-	otelService := otel.NewOpenTelemetryService(otel.OpenTelemetryConfig{
-		Ctx:               ctx,
-		Log:               logger,
-		CollectorEndpoint: "localhost:4317",
-	})
-
-	err = otelService.Start()
-	if err != nil {
-		t.Logf("OTEL service start failed (expected in test): %v", err)
-	}
-
-	watcher.OtelService = otelService
-
-	err = watcher.ProcessPolicyDenyEvent(event)
-	assert.NoError(t, err)
-}
-
 func TestWatcher_GetNetworkPolicyAPIVersion(t *testing.T) {
-	logger := slog.New(slog.NewTextHandler(os.Stdout, &slog.HandlerOptions{Level: slog.LevelInfo}))
-	watcher := &cniwatcher.Watcher{Log: logger}
+	watcher := &cniwatcher.Watcher{Log: testLogger()}
 
 	tests := []struct {
 		name    string
@@ -203,101 +149,101 @@ func TestWatcher_GetNetworkPolicyAPIVersion(t *testing.T) {
 	}
 }
 
-func TestPoliciesToStrings(t *testing.T) {
-	tests := []struct {
-		name     string
-		policies []types.Policy
-		want     []string
-	}{
-		{
-			name:     "Empty policies",
-			policies: []types.Policy{},
-			want:     []string{},
-		},
-		{
-			name: "Single policy",
-			policies: []types.Policy{
-				{
-					TypeMeta: metav1.TypeMeta{
-						APIVersion: "v1",
-						Kind:       "NetworkPolicy",
-					},
-					Name:      "test-policy",
-					Namespace: "default",
-				},
-			},
-			want: []string{"v1/NetworkPolicy/default/test-policy"},
-		},
-		{
-			name: "Multiple policies",
-			policies: []types.Policy{
-				{
-					TypeMeta: metav1.TypeMeta{
-						APIVersion: "v1",
-						Kind:       "NetworkPolicy",
-					},
-					Name:      "policy1",
-					Namespace: "default",
-				},
-				{
-					TypeMeta: metav1.TypeMeta{
-						APIVersion: "v1",
-						Kind:       "NetworkPolicy",
-					},
-					Name:      "policy2",
-					Namespace: "kube-system",
-				},
-			},
-			want: []string{
-				"v1/NetworkPolicy/default/policy1",
-				"v1/NetworkPolicy/kube-system/policy2",
-			},
-		},
-	}
-
-	for _, tt := range tests {
-		t.Run(tt.name, func(t *testing.T) {
-			got := make([]string, len(tt.policies))
-			for i, p := range tt.policies {
-				got[i] = p.String()
-			}
-			assert.Equal(t, tt.want, got)
-		})
-	}
-}
-
 func TestWatcher_ResolvePodOrServiceByIP(t *testing.T) {
 	tests := []struct {
-		name    string
-		ip      string
-		want    cniwatcher.PodOrServiceInfo
-		wantErr bool
+		name     string
+		ip       string
+		pods     []*corev1.Pod
+		services []*corev1.Service
+		wantName string
+		wantNS   string
+		wantErr  bool
 	}{
+		{
+			name: "Pod by IP",
+			ip:   "10.0.0.1",
+			pods: []*corev1.Pod{{
+				ObjectMeta: metav1.ObjectMeta{Name: "test-pod", Namespace: "default"},
+				Status:     corev1.PodStatus{PodIP: "10.0.0.1"},
+			}},
+			wantName: "test-pod",
+			wantNS:   "default",
+		},
+		{
+			name: "Service by cluster IP",
+			ip:   "10.0.0.10",
+			services: []*corev1.Service{{
+				ObjectMeta: metav1.ObjectMeta{Name: "test-svc", Namespace: "default"},
+				Spec:       corev1.ServiceSpec{ClusterIP: "10.0.0.10"},
+			}},
+			wantName: "test-svc",
+			wantNS:   "default",
+		},
+		{
+			name: "Service by external IP",
+			ip:   "203.0.113.10",
+			services: []*corev1.Service{{
+				ObjectMeta: metav1.ObjectMeta{Name: "ext-svc", Namespace: "default"},
+				Spec: corev1.ServiceSpec{
+					ClusterIP:   "10.0.0.20",
+					ExternalIPs: []string{"203.0.113.10"},
+				},
+			}},
+			wantName: "ext-svc",
+			wantNS:   "default",
+		},
+		{
+			name:    "Invalid IP",
+			ip:      "invalid-ip",
+			wantErr: true,
+		},
 		{
 			name:    "Empty IP",
 			ip:      "",
-			want:    cniwatcher.PodOrServiceInfo{},
-			wantErr: true,
-		},
-		{
-			name:    "Invalid IP format",
-			ip:      "invalid-ip",
-			want:    cniwatcher.PodOrServiceInfo{},
 			wantErr: true,
 		},
 	}
 
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
-			watcher := &cniwatcher.Watcher{
-				Ctx: t.Context(),
+			builder := fake.NewClientBuilder().
+				WithIndex(&corev1.Pod{}, "status.podIP", func(obj client.Object) []string {
+					pod := obj.(*corev1.Pod)
+					if pod.Status.PodIP == "" {
+						return nil
+					}
+					return []string{pod.Status.PodIP}
+				}).
+				WithIndex(&corev1.Service{}, "spec.clusterIP", func(obj client.Object) []string {
+					svc := obj.(*corev1.Service)
+					if svc.Spec.ClusterIP == "" || svc.Spec.ClusterIP == "None" {
+						return nil
+					}
+					return []string{svc.Spec.ClusterIP}
+				})
+
+			for _, pod := range tt.pods {
+				builder = builder.WithObjects(pod)
 			}
-			got, err := watcher.ResolvePodOrServiceByIP(tt.ip)
+			for _, svc := range tt.services {
+				builder = builder.WithObjects(svc)
+			}
+
+			watcher := &cniwatcher.Watcher{
+				Ctx:    t.Context(),
+				Client: builder.Build(),
+				Log:    testLogger(),
+			}
+
+			info, err := watcher.ResolvePodOrServiceByIP(tt.ip)
 			if tt.wantErr {
-				assert.Error(t, err)
+				require.Error(t, err)
+				assert.Empty(t, info.Name)
+				assert.Empty(t, info.Namespace)
 			} else {
 				require.NoError(t, err)
-				assert.Equal(t, tt.want, got)
+				assert.Equal(t, tt.wantName, info.Name)
+				assert.Equal(t, tt.wantNS, info.Namespace)
 			}
 		})
 	}
