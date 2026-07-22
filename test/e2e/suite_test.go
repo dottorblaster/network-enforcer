@@ -75,9 +75,10 @@ func installNetEnforcerChart(testCfg *suiteConfig) env.Func {
 			helm.WithArgs("--set", fmt.Sprintf("cniwatcher.image.repository=%s", cniWatcherRepo)),
 			helm.WithArgs("--set", fmt.Sprintf("cniwatcher.image.tag=%s", cniWatcherTag)),
 			helm.WithArgs("--set", fmt.Sprintf("cniwatcher.cniType=%s", testCfg.cni)),
-			// we reduce the time here to have faster feedback
-			helm.WithArgs("--set", "obi.config.data.otel_metrics_export.interval=3s"),
-			helm.WithArgs("--set", "controller.drainFlowsInterval=3s"),
+			helm.WithArgs("--set", fmt.Sprintf("obi.config.data.otel_metrics_export.interval=%s",
+				testCfg.drainFlowsInterval.String())),
+			helm.WithArgs("--set", fmt.Sprintf("controller.drainFlowsInterval=%s",
+				testCfg.drainFlowsInterval.String())),
 
 			helm.WithWait(),
 			helm.WithTimeout(defaultHelmTimeout.String()),
