@@ -60,6 +60,10 @@ func TestCompleteFlow(t *testing.T) {
 				return ctx
 			}).
 		Assess("Check violations are reported", checkViolations).
+		Assess("Check TCP traffic is still allowed",
+			func(ctx context.Context, t *testing.T, _ *envconf.Config) context.Context {
+				return assertPacketSentFromClient(ctx, t, corev1.ProtocolTCP)
+			}).
 		Teardown(teardownSimpleAppWorkload).
 		Teardown(teardownTestNamespace).
 		Feature()
