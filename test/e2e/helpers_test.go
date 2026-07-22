@@ -2,6 +2,7 @@ package e2e_test
 
 import (
 	"context"
+	"fmt"
 	"log/slog"
 	"os"
 	"testing"
@@ -16,6 +17,7 @@ import (
 	"sigs.k8s.io/e2e-framework/klient/wait/conditions"
 	"sigs.k8s.io/e2e-framework/pkg/env"
 	"sigs.k8s.io/e2e-framework/pkg/envconf"
+	"sigs.k8s.io/e2e-framework/third_party/helm"
 )
 
 type key string
@@ -129,4 +131,17 @@ func requireEqualNetworkPolicyProposal(
 		actual.Spec.Egress,
 		"network policy proposal egress rules do not match expected",
 	)
+}
+
+func addLocalChartRepo(ctx context.Context, manager *helm.Manager, localRepoName, repoURL string) error {
+	getSetupLogger(ctx).InfoContext(ctx, "⬇️ adding local helm repo",
+		"localName", localRepoName,
+		"url", repoURL)
+	if err := manager.RunRepo(helm.WithArgs("add", localRepoName, repoURL)); err != nil {
+		return fmt.Errorf("failed to add local helm repo: %w", err)
+	}
+	if err := manager.RunRepo(helm.WithArgs("update")); err != nil {
+		return fmt.Errorf("failed to update helm repos: %w", err)
+	}
+	return nil
 }

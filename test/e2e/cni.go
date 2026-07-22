@@ -33,23 +33,9 @@ func installCilium(ctx context.Context, cfg *envconf.Config) (context.Context, e
 		chartPath     = "/cilium"
 	)
 
-	logger := getSetupLogger(ctx)
 	manager := helm.New(cfg.KubeconfigFile())
-	// Add the repo locally if not present
-	logger.InfoContext(ctx, "adding cilium local repo", "repo", repoLocalName, "url", repoURL)
-	if err := manager.RunRepo(helm.WithArgs("add", repoLocalName, repoURL)); err != nil {
-		return ctx, fmt.Errorf(
-			"failed to add cilium local repo: %w",
-			err,
-		)
-	}
-	// Update the repo.
-	logger.InfoContext(ctx, "updating helm repos")
-	if err := manager.RunRepo(helm.WithArgs("update")); err != nil {
-		return ctx, fmt.Errorf(
-			"failed to update helm repos : %w",
-			err,
-		)
+	if err := addLocalChartRepo(ctx, manager, repoLocalName, repoURL); err != nil {
+		return ctx, err
 	}
 
 	helmOpts := []helm.Option{
@@ -65,6 +51,7 @@ func installCilium(ctx context.Context, cfg *envconf.Config) (context.Context, e
 		helm.WithTimeout(defaultHelmTimeout.String()),
 	}
 
+	logger := getSetupLogger(ctx)
 	logger.InfoContext(ctx, "installing cilium chart", "chart", repoLocalName+chartPath, "version", version)
 	if err := manager.RunInstall(helmOpts...); err != nil {
 		return ctx, fmt.Errorf("installing cilium chart: %w", err)
