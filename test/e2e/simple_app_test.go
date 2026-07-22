@@ -320,10 +320,12 @@ func assessK8sNetworkPoliciesAreCreated(ctx context.Context, t *testing.T, _ *en
 		require.Equal(
 			t,
 			[]metav1.OwnerReference{{
-				APIVersion: policy.GroupVersionKind().GroupVersion().String(),
-				Kind:       policy.Kind,
-				Name:       policy.Name,
-				UID:        policy.UID,
+				APIVersion:         securityv1alpha1.GroupVersion.String(),
+				Kind:               "WorkloadNetworkPolicy",
+				Name:               policy.Name,
+				UID:                policy.UID,
+				Controller:         func(b bool) *bool { return &b }(true),
+				BlockOwnerDeletion: func(b bool) *bool { return &b }(true),
 			}},
 			k8sPolicy.OwnerReferences,
 			"K8s Network policy associated with %q doesn't contain the expected owner references",
