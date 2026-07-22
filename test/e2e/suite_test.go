@@ -5,7 +5,6 @@ import (
 	"fmt"
 	"log/slog"
 	"os"
-	"os/exec"
 	"strings"
 	"testing"
 
@@ -46,19 +45,14 @@ func TestMain(m *testing.M) {
 		injectSuiteConfig(testSuiteConf),
 	}
 
-	testEnv.Setup(setupFuncs...)
-
-	exitCode := testEnv.Run(m)
-	if exitCode == 0 {
-		if err := deleteKindCluster(clusterName); err != nil {
-			fmt.Fprintf(os.Stderr, "failed to delete kind cluster %q after success: %v\n", clusterName, err)
-			exitCode = 1
-		}
-	} else {
-		fmt.Fprintf(os.Stderr, "tests failed: keeping kind cluster %q for investigation\n", clusterName)
+	finishFuncs := []env.Func{
+		envfuncs.ExportClusterLogs(clusterName, testSuiteConf.logsDir),
+		envfuncs.DestroyCluster(clusterName),
 	}
 
-	os.Exit(exitCode)
+	testEnv.Setup(setupFuncs...)
+	testEnv.Finish(finishFuncs...)
+	os.Exit(testEnv.Run(m))
 }
 
 func installNetEnforcerChart(testCfg *suiteConfig) env.Func {
@@ -129,18 +123,4 @@ func parseImage(image string) (string, string) {
 		return image[:i], image[i+1:]
 	}
 	return image, "latest"
-}
-
-func deleteKindCluster(clusterName string) error {
-	cmd := exec.Command("kind", "delete", "cluster", "--name", clusterName)
-	output, err := cmd.CombinedOutput()
-	if err != nil {
-		return fmt.Errorf(
-			"kind delete cluster --name %s: %w (output: %s)",
-			clusterName,
-			err,
-			strings.TrimSpace(string(output)),
-		)
-	}
-	return nil
 }
