@@ -13,10 +13,9 @@ const (
 	defaultReleaseName   = "network-enforcer"
 	defaultReleaseNS     = "network-enforcer"
 	defaultNamespacePref = "network-enforcer-e2e"
-	defaultCNI           = kindnet
+	defaultCNI           = cilium
 
-	kindnetConfigPath = "./clusters/kindnet.yaml"
-	noCNIConfigPath   = "./clusters/no-cni.yaml"
+	noCNIConfigPath = "./clusters/no-cni.yaml"
 )
 
 const (
@@ -37,7 +36,7 @@ type suiteConfig struct {
 }
 
 func loadSuiteConfig() suiteConfig {
-	conf := suiteConfig{
+	return suiteConfig{
 		logsDir:         defaultLogsDir,
 		chartPath:       defaultChartPath,
 		releaseName:     defaultReleaseName,
@@ -45,16 +44,8 @@ func loadSuiteConfig() suiteConfig {
 		image:           defaultImage,
 		namespacePrefix: defaultNamespacePref,
 		cni:             cniType(readEnvOrDefault("E2E_CNI", string(defaultCNI))),
+		kindConfigPath:  noCNIConfigPath,
 	}
-
-	//nolint:exhaustive // all cases there are not kindnet should use the noCNIConfigPath
-	switch conf.cni {
-	case kindnet:
-		conf.kindConfigPath = kindnetConfigPath
-	default:
-		conf.kindConfigPath = noCNIConfigPath
-	}
-	return conf
 }
 
 func readEnvOrDefault(name, defaultValue string) string {

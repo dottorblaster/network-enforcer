@@ -74,11 +74,6 @@ func installNetEnforcerChart(testCfg *suiteConfig) env.Func {
 			helm.WithTimeout(defaultHelmTimeout.String()),
 		}
 
-		if testCfg.cni == kindnet {
-			// with kindnet we don't need the cniwatcher
-			helmOpts = append(helmOpts, helm.WithArgs("--set", "cniwatcher.enabled=false"))
-		}
-
 		if err := manager.RunInstall(helmOpts...); err != nil {
 			return ctx, fmt.Errorf("install network enforcer chart: %w", err)
 		}

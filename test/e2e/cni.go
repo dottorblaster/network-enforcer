@@ -20,9 +20,8 @@ import (
 type cniType string
 
 const (
-	kindnet cniType = "kindnet"
-	calico  cniType = "calico"
-	cilium  cniType = "cilium"
+	calico cniType = "calico"
+	cilium cniType = "cilium"
 )
 
 func installCilium(ctx context.Context, cfg *envconf.Config) (context.Context, error) {
@@ -111,9 +110,6 @@ func installCalico(ctx context.Context, _ *envconf.Config) (context.Context, err
 func installCNI(t cniType) env.Func {
 	return func(ctx context.Context, cfg *envconf.Config) (context.Context, error) {
 		switch t {
-		case kindnet:
-			// kindnet is already installed by kind, nothing to do
-			return ctx, nil
 		case calico:
 			return installCalico(ctx, cfg)
 		case cilium:
