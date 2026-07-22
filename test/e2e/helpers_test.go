@@ -2,6 +2,9 @@ package e2e_test
 
 import (
 	"context"
+	"fmt"
+	"log/slog"
+	"os"
 	"testing"
 
 	securityv1alpha1 "github.com/rancher-sandbox/network-enforcer/api/v1alpha1"
@@ -12,10 +15,37 @@ import (
 	"sigs.k8s.io/e2e-framework/klient/k8s/resources"
 	"sigs.k8s.io/e2e-framework/klient/wait"
 	"sigs.k8s.io/e2e-framework/klient/wait/conditions"
+	"sigs.k8s.io/e2e-framework/pkg/env"
 	"sigs.k8s.io/e2e-framework/pkg/envconf"
+	"sigs.k8s.io/e2e-framework/third_party/helm"
 )
 
 type key string
+
+const (
+	suiteCfgKey = key("suiteConfig")
+	loggerKey   = key("logger")
+)
+
+func injectSetupLogger() env.Func {
+	return func(ctx context.Context, _ *envconf.Config) (context.Context, error) {
+		return context.WithValue(ctx, loggerKey, slog.New(slog.NewJSONHandler(os.Stdout, nil))), nil
+	}
+}
+
+func getSetupLogger(ctx context.Context) *slog.Logger {
+	return ctx.Value(loggerKey).(*slog.Logger)
+}
+
+func injectSuiteConfig(sc suiteConfig) env.Func {
+	return func(ctx context.Context, _ *envconf.Config) (context.Context, error) {
+		return context.WithValue(ctx, suiteCfgKey, sc), nil
+	}
+}
+
+func getSuiteConfig(ctx context.Context) suiteConfig {
+	return ctx.Value(suiteCfgKey).(suiteConfig)
+}
 
 func setupSharedK8sClient(ctx context.Context, t *testing.T, config *envconf.Config) context.Context {
 	t.Log("setup shared k8s client")
@@ -101,4 +131,17 @@ func requireEqualNetworkPolicyProposal(
 		actual.Spec.Egress,
 		"network policy proposal egress rules do not match expected",
 	)
+}
+
+func addLocalChartRepo(ctx context.Context, manager *helm.Manager, localRepoName, repoURL string) error {
+	getSetupLogger(ctx).InfoContext(ctx, "⬇️ adding local helm repo",
+		"localName", localRepoName,
+		"url", repoURL)
+	if err := manager.RunRepo(helm.WithArgs("add", localRepoName, repoURL)); err != nil {
+		return fmt.Errorf("failed to add local helm repo: %w", err)
+	}
+	if err := manager.RunRepo(helm.WithArgs("update")); err != nil {
+		return fmt.Errorf("failed to update helm repos: %w", err)
+	}
+	return nil
 }

@@ -7,16 +7,17 @@ import (
 )
 
 const (
-	defaultChartPath     = "../../charts/network-enforcer"
-	defaultLogsDir       = "./logs"
-	defaultImage         = "ghcr.io/rancher-sandbox/network-enforcer/controller:latest"
-	defaultReleaseName   = "network-enforcer"
-	defaultReleaseNS     = "network-enforcer"
-	defaultNamespacePref = "network-enforcer-e2e"
-	defaultCNI           = kindnet
+	defaultChartPath          = "../../charts/network-enforcer"
+	defaultLogsDir            = "./logs"
+	defaultControllerImage    = "ghcr.io/rancher-sandbox/network-enforcer/controller:latest"
+	defaultCNIWatcherImage    = "ghcr.io/rancher-sandbox/network-enforcer/cniwatcher:latest"
+	defaultReleaseName        = "network-enforcer"
+	defaultReleaseNS          = "network-enforcer"
+	defaultNamespacePref      = "network-enforcer-e2e"
+	defaultCNI                = cilium
+	defaultDrainFlowsInterval = 3 * time.Second // we reduce the time here to have faster feedback on the learning phase
 
-	kindnetConfigPath = "./clusters/kindnet.yaml"
-	noCNIConfigPath   = "./clusters/no-cni.yaml"
+	noCNIConfigPath = "./clusters/no-cni.yaml"
 )
 
 const (
@@ -26,35 +27,31 @@ const (
 )
 
 type suiteConfig struct {
-	kindConfigPath  string
-	logsDir         string
-	chartPath       string
-	releaseName     string
-	releaseNS       string
-	image           string
-	namespacePrefix string
-	cni             cniType
+	kindConfigPath     string
+	logsDir            string
+	chartPath          string
+	releaseName        string
+	releaseNS          string
+	controllerImage    string
+	cniWatcherImage    string
+	namespacePrefix    string
+	cni                cniType
+	drainFlowsInterval time.Duration
 }
 
 func loadSuiteConfig() suiteConfig {
-	conf := suiteConfig{
-		logsDir:         defaultLogsDir,
-		chartPath:       defaultChartPath,
-		releaseName:     defaultReleaseName,
-		releaseNS:       defaultReleaseNS,
-		image:           defaultImage,
-		namespacePrefix: defaultNamespacePref,
-		cni:             cniType(readEnvOrDefault("E2E_CNI", string(defaultCNI))),
+	return suiteConfig{
+		logsDir:            defaultLogsDir,
+		chartPath:          defaultChartPath,
+		releaseName:        defaultReleaseName,
+		releaseNS:          defaultReleaseNS,
+		controllerImage:    defaultControllerImage,
+		cniWatcherImage:    defaultCNIWatcherImage,
+		namespacePrefix:    defaultNamespacePref,
+		cni:                cniType(readEnvOrDefault("E2E_CNI", string(defaultCNI))),
+		kindConfigPath:     noCNIConfigPath,
+		drainFlowsInterval: defaultDrainFlowsInterval,
 	}
-
-	//nolint:exhaustive // all cases there are not kindnet should use the noCNIConfigPath
-	switch conf.cni {
-	case kindnet:
-		conf.kindConfigPath = kindnetConfigPath
-	default:
-		conf.kindConfigPath = noCNIConfigPath
-	}
-	return conf
 }
 
 func readEnvOrDefault(name, defaultValue string) string {

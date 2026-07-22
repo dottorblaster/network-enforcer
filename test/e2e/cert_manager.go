@@ -23,11 +23,8 @@ func installCertManager() env.Func {
 	return func(ctx context.Context, cfg *envconf.Config) (context.Context, error) {
 		manager := helm.New(cfg.KubeconfigFile())
 
-		if err := manager.RunRepo(helm.WithArgs("add", jetstackRepoName, jetstackRepoURL)); err != nil {
-			return ctx, fmt.Errorf("add jetstack helm repo: %w", err)
-		}
-		if err := manager.RunRepo(helm.WithArgs("update")); err != nil {
-			return ctx, fmt.Errorf("update helm repos: %w", err)
+		if err := addLocalChartRepo(ctx, manager, jetstackRepoName, jetstackRepoURL); err != nil {
+			return ctx, err
 		}
 
 		// cert-manager (and its webhook) must be ready before the CSI driver,
