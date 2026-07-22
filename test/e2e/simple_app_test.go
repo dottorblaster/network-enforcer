@@ -1,7 +1,6 @@
 package e2e_test
 
 import (
-	"bytes"
 	"context"
 	"testing"
 	"time"
@@ -30,7 +29,11 @@ func TestSimpleAppConnectivity(t *testing.T) {
 		Setup(setupSharedK8sClient).
 		Setup(setupTestNamespace).
 		Setup(setupSimpleAppWorkload).
-		Setup(generateTraffic).
+		// we send traffic to the TCP service and we expect it to succeed, this will generate proposals for the client and server deployments.
+		Assess("Send traffic to TCP service",
+			func(ctx context.Context, t *testing.T, _ *envconf.Config) context.Context {
+				return assertPacketSentFromClient(ctx, t, corev1.ProtocolTCP)
+			}).
 		Assess("Check if policy proposals are generated", assessPolicyProposalsGenerated).
 		Assess("Promote proposals into monitor policies", assessPolicyProposalsPromoted).
 		Teardown(teardownSimpleAppWorkload).
@@ -40,37 +43,13 @@ func TestSimpleAppConnectivity(t *testing.T) {
 	testEnv.Test(t, feature)
 }
 
-func generateTraffic(ctx context.Context, t *testing.T, _ *envconf.Config) context.Context {
-	t.Helper()
-	namespace := getNamespace(ctx)
-
-	execCtx, cancel := context.WithTimeout(ctx, defaultPodExecTimeout)
-	defer cancel()
-
-	var stdout bytes.Buffer
-	var stderr bytes.Buffer
-
-	r := getClient(ctx)
-	err := r.ExecInDeployment(
-		execCtx,
-		namespace,
-		simpleAppClientDeploymentName,
-		[]string{"curl", "--silent", "--show-error", "--fail", "http://http-service"},
-		&stdout,
-		&stderr,
-	)
-	require.NoError(t, err, "failed executing command in pod %q: %v", simpleAppClientDeploymentName, err)
-	require.Empty(t, stderr.String(), "expected non-empty output from curl command")
-	return ctx
-}
-
 func assessPolicyProposalsGenerated(ctx context.Context, t *testing.T, _ *envconf.Config) context.Context {
 	t.Helper()
 	namespace := getNamespace(ctx)
 
 	tcpProtocol := corev1.ProtocolTCP
 	udpProtocol := corev1.ProtocolUDP
-	dstPort := intstr.FromInt(80)
+	dstPort := intstr.FromInt(simpleAppTCPServicePort)
 	dnsPort := intstr.FromInt(53)
 
 	expectedClientEgressProposal := securityv1alpha1.WorkloadNetworkPolicyProposal{

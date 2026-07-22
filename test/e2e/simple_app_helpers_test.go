@@ -1,12 +1,17 @@
 package e2e_test
 
 import (
+	"bytes"
 	"context"
+	"fmt"
+	"strconv"
 	"testing"
 
-	"github.com/stretchr/testify/require"
 	appsv1 "k8s.io/api/apps/v1"
+	corev1 "k8s.io/api/core/v1"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
+
+	"github.com/stretchr/testify/require"
 	"sigs.k8s.io/e2e-framework/klient/decoder"
 	"sigs.k8s.io/e2e-framework/klient/k8s/resources"
 	"sigs.k8s.io/e2e-framework/klient/wait"
@@ -19,9 +24,8 @@ const (
 	simpleAppManifest             = "simple_app.yaml"
 	simpleAppClientDeploymentName = "http-client"
 	simpleAppServerDeploymentName = "http-server"
-	simpleAppContainerName        = "curl-client"
-	simpleAppClientPodName        = "simple-app-client"
-	simpleAppServerPodName        = "simple-app-server"
+	simpleAppTCPServicePort       = 18080
+	simpleAppUDPServicePort       = 18083
 )
 
 func teardownSimpleAppWorkload(ctx context.Context, t *testing.T, _ *envconf.Config) context.Context {
@@ -86,5 +90,84 @@ func setupSimpleAppWorkload(ctx context.Context, t *testing.T, _ *envconf.Config
 		wait.WithTimeout(defaultOperationTimeout),
 	)
 	require.NoError(t, err, "wait server deployment ready")
+	return ctx
+}
+
+func getProtoCmd(proto corev1.Protocol) (string, []string) {
+	const (
+		tcpPayload           = "tcp-e2e-payload"
+		udpPayload           = "udp-e2e-payload"
+		simpleAppServiceName = "http-service"
+	)
+
+	switch proto {
+	case corev1.ProtocolTCP:
+		return tcpPayload, []string{
+			"sh",
+			"-c",
+			fmt.Sprintf(
+				"printf %s | nc -w 2 %s %d",
+				strconv.Quote(tcpPayload),
+				simpleAppServiceName,
+				simpleAppTCPServicePort,
+			),
+		}
+	case corev1.ProtocolUDP:
+		return udpPayload, []string{
+			"sh",
+			"-c",
+			fmt.Sprintf(
+				"printf %s | nc -u -w 2 %s %d",
+				strconv.Quote(udpPayload),
+				simpleAppServiceName,
+				simpleAppUDPServicePort,
+			),
+		}
+	case corev1.ProtocolSCTP:
+		fallthrough
+	default:
+		panic(fmt.Sprintf("unsupported protocol: %v", proto))
+	}
+}
+
+func execInSimpleClientDeployment(
+	ctx context.Context,
+	t *testing.T,
+	command []string,
+) (string, string) {
+	t.Helper()
+
+	namespace := getNamespace(ctx)
+	r := getClient(ctx)
+	var stdout bytes.Buffer
+	var stderr bytes.Buffer
+
+	execCtx, cancel := context.WithTimeout(ctx, defaultPodExecTimeout)
+	defer cancel()
+
+	err := r.ExecInDeployment(
+		execCtx,
+		namespace,
+		simpleAppClientDeploymentName,
+		command,
+		&stdout,
+		&stderr,
+	)
+
+	require.NoError(t, err, "failed executing command in deployment %q: %v", simpleAppClientDeploymentName, err)
+	return stdout.String(), stderr.String()
+}
+
+func assertPacketSentFromClient(
+	ctx context.Context,
+	t *testing.T,
+	proto corev1.Protocol,
+) context.Context {
+	t.Helper()
+
+	payload, cmd := getProtoCmd(proto)
+	stdout, stderr := execInSimpleClientDeployment(ctx, t, cmd)
+	require.Empty(t, stderr)
+	require.Contains(t, stdout, payload, "client output should contain echoed payload")
 	return ctx
 }
