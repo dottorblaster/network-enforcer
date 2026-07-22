@@ -28,7 +28,6 @@ func injectSuiteConfig(sc suiteConfig) env.Func {
 	}
 }
 
-//nolint:unused // will be used in the future to access the suite config from the context
 func getSuiteConfig(ctx context.Context) suiteConfig {
 	return ctx.Value(suiteCfgKey).(suiteConfig)
 }

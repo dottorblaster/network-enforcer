@@ -11,6 +11,7 @@ import (
 
 	corev1 "k8s.io/api/core/v1"
 	networkingv1 "k8s.io/api/networking/v1"
+	apiequality "k8s.io/apimachinery/pkg/api/equality"
 	apierrors "k8s.io/apimachinery/pkg/api/errors"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 
@@ -24,7 +25,7 @@ import (
 // - deployment communication without service different nodes.
 // - external traffic
 // - internal traffic through NodePort service.
-func TestSimpleAppConnectivity(t *testing.T) {
+func TestCompleteFlow(t *testing.T) {
 	feature := features.New("Service same node").
 		Setup(setupSharedK8sClient).
 		Setup(setupTestNamespace).
@@ -34,8 +35,31 @@ func TestSimpleAppConnectivity(t *testing.T) {
 			func(ctx context.Context, t *testing.T, _ *envconf.Config) context.Context {
 				return assertPacketSentFromClient(ctx, t, corev1.ProtocolTCP)
 			}).
-		Assess("Check if policy proposals are generated", assessPolicyProposalsGenerated).
+		Assess("Check if proposals are generated", assessPolicyProposalsGenerated).
 		Assess("Promote proposals into monitor policies", assessPolicyProposalsPromoted).
+		Assess("Send traffic to UDP service in monitor mode",
+			func(ctx context.Context, t *testing.T, _ *envconf.Config) context.Context {
+				return assertPacketSentFromClient(ctx, t, corev1.ProtocolUDP)
+			}).
+		Assess("Check proposals are not regenerated in monitor mode", assessProposalsAreNotRegenerated).
+		Assess("Check policies are not updated in monitor mode", assessPoliciesAreNotUpdatedInMonitorMode).
+		Assess("Check NetworkPolicies are created in protect mode", assessK8sNetworkPoliciesAreCreated).
+		Assess("Send traffic to UDP service in protect mode",
+			func(ctx context.Context, t *testing.T, _ *envconf.Config) context.Context {
+				// we need to try multiple times because it may take some time for the policy to be enforced by the CNI.
+				require.Eventually(t, func() bool {
+					_, cmd := getProtoCmd(corev1.ProtocolUDP)
+					stdout, _ := execInSimpleClientDeployment(ctx, t, cmd)
+					// if the policy is enforced the stdout should be empty, because the traffic is blocked.
+					if len(stdout) > 0 {
+						t.Logf("Policy not yet enforced")
+						return false
+					}
+					return true
+				}, defaultOperationTimeout, 1*time.Second, "UDP traffic is not blocked in protect mode")
+				return ctx
+			}).
+		Assess("Check violations are reported", checkViolations).
 		Teardown(teardownSimpleAppWorkload).
 		Teardown(teardownTestNamespace).
 		Feature()
@@ -177,6 +201,7 @@ func assessPolicyProposalsPromoted(ctx context.Context, t *testing.T, _ *envconf
 	proposals := ctx.Value(key("proposals")).([]securityv1alpha1.WorkloadNetworkPolicyProposal)
 	client := getClient(ctx)
 
+	policies := make([]securityv1alpha1.WorkloadNetworkPolicy, 0, len(proposals))
 	for _, proposal := range proposals {
 		// We promote the proposal to a network policy.
 		proposal.SetPromotionLabel()
@@ -193,11 +218,121 @@ func assessPolicyProposalsPromoted(ctx context.Context, t *testing.T, _ *envconf
 		require.True(t, policy.HasPromotedLabel(proposal.Name))
 		require.Equal(t, securityv1alpha1.WorkloadNetworkPolicyModeMonitor, policy.Spec.Mode)
 		require.Equal(t, proposal.Spec, policy.Spec.PolicyTemplate)
+		policies = append(policies, policy)
 
 		// We expect the proposal to be deleted
 		require.Eventually(t, func() bool {
 			return apierrors.IsNotFound(client.Get(ctx, proposal.Name, proposal.Namespace, &proposal))
 		}, defaultOperationTimeout, 1*time.Second, "network policy proposal %q was not deleted", proposal.NamespacedName().String())
+	}
+	return context.WithValue(ctx, key("policies"), policies)
+}
+
+func assessProposalsAreNotRegenerated(ctx context.Context, t *testing.T, _ *envconf.Config) context.Context {
+	t.Helper()
+
+	// we recover the proposal from the context.
+	storedProposals := ctx.Value(key("proposals")).([]securityv1alpha1.WorkloadNetworkPolicyProposal)
+	client := getClient(ctx)
+
+	for _, proposal := range storedProposals {
+		require.Never(t, func() bool {
+			var p securityv1alpha1.WorkloadNetworkPolicyProposal
+			// the error should be always not found
+			return !apierrors.IsNotFound(client.Get(ctx, proposal.Name, proposal.Namespace, &p))
+		}, 2*getSuiteConfig(ctx).drainFlowsInterval, 1*time.Second, "Network policy proposal %q is created, but it should not be", proposal.NamespacedName().String())
+	}
+	return ctx
+}
+
+func assessPoliciesAreNotUpdatedInMonitorMode(ctx context.Context, t *testing.T, _ *envconf.Config) context.Context {
+	storedPolicies := ctx.Value(key("policies")).([]securityv1alpha1.WorkloadNetworkPolicy)
+	client := getClient(ctx)
+
+	for _, storedPolicy := range storedPolicies {
+		require.Never(t, func() bool {
+			var policy securityv1alpha1.WorkloadNetworkPolicy
+			err := client.Get(ctx, storedPolicy.Name, storedPolicy.Namespace, &policy)
+			require.NoError(t, err, "failed to get network policy %q", storedPolicy.NamespacedName().String())
+
+			if len(policy.Status.Violations) > 0 {
+				// todo!: this will change in the future when we will implement violation for monitor mode
+				t.Logf(
+					"Network policy %q has violations but it shouldn't: %v",
+					policy.NamespacedName().String(),
+					policy.Status.Violations,
+				)
+				return true
+			}
+
+			// the spec shouldn't change
+			return !apiequality.Semantic.DeepEqual(storedPolicy.Spec.PolicyTemplate, policy.Spec.PolicyTemplate)
+		}, 2*getSuiteConfig(ctx).drainFlowsInterval, 1*time.Second, "Network policy is updated, but it should not be", storedPolicy.NamespacedName().String())
+	}
+	return ctx
+}
+
+func assessK8sNetworkPoliciesAreCreated(ctx context.Context, t *testing.T, _ *envconf.Config) context.Context {
+	storedPolicies := ctx.Value(key("policies")).([]securityv1alpha1.WorkloadNetworkPolicy)
+	client := getClient(ctx)
+
+	// For each policy we change mode to protect
+	for _, policy := range storedPolicies {
+		require.Eventually(t, func() bool {
+			if err := client.Get(ctx, policy.Name, policy.Namespace, &policy); err != nil {
+				t.Logf("failed to get network policy %q: %v", policy.NamespacedName().String(), err)
+			}
+			policy.Spec.Mode = securityv1alpha1.WorkloadNetworkPolicyModeProtect
+			if err := client.Update(ctx, &policy); err != nil {
+				t.Logf("failed to update network policy %q: %v", policy.NamespacedName().String(), err)
+				return false
+			}
+			return true
+		}, defaultOperationTimeout, 1*time.Second)
+	}
+
+	// Now we check the k8s network policies are created
+	// we want to do it in a separate for loop so that k8s network policies are created independently
+	for _, policy := range storedPolicies {
+		var k8sPolicy networkingv1.NetworkPolicy
+		require.Eventually(t, func() bool {
+			if err := client.Get(ctx, policy.Name, policy.Namespace, &k8sPolicy); err != nil {
+				t.Logf("failed to get k8s network policy %q: %v", policy.NamespacedName().String(), err)
+				return false
+			}
+			return true
+		}, defaultOperationTimeout, 1*time.Second)
+
+		require.Equal(
+			t,
+			policy.Spec.PolicyTemplate,
+			k8sPolicy.Spec,
+			"Network policy %q spec is not equal to the expected spec",
+			policy.NamespacedName().String(),
+		)
+	}
+	return ctx
+}
+
+func checkViolations(ctx context.Context, t *testing.T, _ *envconf.Config) context.Context {
+	if getSuiteConfig(ctx).cni == cilium {
+		// todo!: With Cilium we will never receive violations in the policies because
+		// of this issue https://github.com/rancher-sandbox/network-enforcer/issues/19
+		return ctx
+	}
+
+	storedPolicies := ctx.Value(key("policies")).([]securityv1alpha1.WorkloadNetworkPolicy)
+	client := getClient(ctx)
+
+	for _, policy := range storedPolicies {
+		require.Eventually(t, func() bool {
+			var updatedPolicy securityv1alpha1.WorkloadNetworkPolicy
+			err := client.Get(ctx, policy.Name, policy.Namespace, &updatedPolicy)
+			require.NoError(t, err, "failed to get network policy %q", policy.NamespacedName().String())
+
+			// Check if there are any violations
+			return len(updatedPolicy.Status.Violations) > 0
+		}, defaultOperationTimeout, 1*time.Second)
 	}
 	return ctx
 }
