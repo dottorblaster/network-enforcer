@@ -22,9 +22,13 @@ import (
 const targetMetricName = "obi.network.flow.bytes"
 
 const (
+	// the iface.direction OBI could return.
 	directionIngress = "ingress"
 	directionEgress  = "egress"
-	directionUnknown = "UNKNOWN"
+	directionUnknown = "unknown"
+
+	// the direction we return when OBI returns unsupported direction.
+	directionNotDefined = "not_defined"
 )
 
 type Receiver struct {
@@ -125,12 +129,14 @@ func (r *Receiver) processMetric(m *metricspb.Metric) {
 
 func normalizeProtocol(protocol string) (corev1.Protocol, error) {
 	p := corev1.Protocol(strings.ToUpper(protocol))
-	//nolint:exhaustive // we don't want to manage SCTP
+
 	switch p {
 	case corev1.ProtocolTCP, corev1.ProtocolUDP:
 		return p, nil
+	case corev1.ProtocolSCTP:
+		fallthrough
 	default:
-		return corev1.Protocol(""), fmt.Errorf("unknown protocol: %s", protocol)
+		return corev1.Protocol(""), fmt.Errorf("not supported protocol: %s", protocol)
 	}
 }
 
@@ -148,9 +154,37 @@ func (r *Receiver) generateFlow(attrs map[string]string) *topology.FlowRecord {
 	// Server service -> client pod
 	// {"attrs": {"client.port":"35796","direction":"response","dst.address":"10.0.0.245","dst.name":"http-client-6d87bb58d7-v7jfc","dst.port":"35796","iface.direction":"ingress","k8s.dst.name":"http-client-6d87bb58d7-v7jfc","k8s.dst.namespace":"default","k8s.dst.node.ip":"172.18.0.2","k8s.dst.node.name":"kind-control-plane","k8s.dst.owner.name":"http-client","k8s.dst.owner.type":"Deployment","k8s.dst.type":"Pod","k8s.src.name":"http-service","k8s.src.namespace":"default","k8s.src.owner.name":"http-service","k8s.src.owner.type":"Service","k8s.src.type":"Service","network.protocol.name":"www","network.type":"ipv4","obi.ip":"172.18.0.2","server.port":"80","src.address":"10.96.18.232","src.name":"http-service","src.port":"80","transport":"TCP"}}
 
-	direction := normalizeDirection(attrs["iface.direction"])
-	// If direction is ingress drop the flow for now, egress should be enough
-	if direction != directionEgress {
+	protocol, err := normalizeProtocol(attrs["transport"])
+	if err != nil {
+		r.log.Warn("skipping datapoint: missing protocol", "attrs", attrs)
+		return nil
+	}
+
+	switch protocol {
+	case corev1.ProtocolTCP:
+		direction := normalizeDirection(attrs["iface.direction"])
+		// If direction is ingress drop the flow for now, egress should be enough
+		if direction != directionEgress {
+			return nil
+		}
+	case corev1.ProtocolUDP:
+		// Unfortunately, OBI has disabled the direction guessing on UDP flows by default in https://github.com/open-telemetry/opentelemetry-ebpf-instrumentation/pull/1519
+		// Instead of relying on iface.direction, we implement a function to detect UDP server/client.
+		// If we don't know for sure, both directions will be added in the proposals.
+		var isIngress bool
+		isIngress, err = isUDPIngressFlow(attrs)
+		if err != nil {
+			r.log.Warn("failed to check if we should skip udp flow", "error", err)
+			return nil
+		}
+		if isIngress {
+			r.log.Debug("skipping datapoint: udp ingress flow", "attrs", attrs)
+			return nil
+		}
+	case corev1.ProtocolSCTP:
+		fallthrough
+	default:
+		r.log.Warn("not supported protocol", "protocol", protocol)
 		return nil
 	}
 
@@ -191,12 +225,6 @@ func (r *Receiver) generateFlow(attrs map[string]string) *topology.FlowRecord {
 		return nil
 	}
 
-	protocol, err := normalizeProtocol(attrs["transport"])
-	if err != nil {
-		r.log.Warn("skipping datapoint: missing protocol", "attrs", attrs)
-		return nil
-	}
-
 	dstPort, err := strconv.ParseInt(dstPortStr, 10, 32)
 	if err != nil || dstPort <= 0 || dstPort > 65535 {
 		r.log.Warn("Dropped datapoint with missing or invalid dst.port", "value", dstPortStr)
@@ -221,14 +249,33 @@ func (r *Receiver) generateFlow(attrs map[string]string) *topology.FlowRecord {
 	}
 }
 
+// isUDPIngressFlow returns true for UDP ingress flow (src port < 1024, dst port > 1024),
+// which OBI cannot classify directionally — we skip those to avoid duplicate flows.
+func isUDPIngressFlow(attrs map[string]string) (bool, error) {
+	dstPortNum, err := strconv.Atoi(attrs["dst.port"])
+	if err != nil {
+		return false, fmt.Errorf("failed to convert dst.port to integer: %w", err)
+	}
+	srcPortNum, err := strconv.Atoi(attrs["src.port"])
+	if err != nil {
+		return false, fmt.Errorf("failed to convert src.port to integer: %w", err)
+	}
+	if srcPortNum < 1024 && dstPortNum > 1024 {
+		return true, nil
+	}
+	return false, nil
+}
+
 func normalizeDirection(direction string) string {
 	switch direction {
 	case directionIngress:
 		return directionIngress
 	case directionEgress:
 		return directionEgress
+	case directionUnknown:
+		return directionUnknown
 	}
-	return directionUnknown
+	return directionNotDefined
 }
 
 func attrMap(attrs []*commonpb.KeyValue) map[string]string {
