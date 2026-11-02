@@ -1,6 +1,6 @@
 dependencies:
 - name: opentelemetry-ebpf-instrumentation
   repository: https://open-telemetry.github.io/opentelemetry-helm-charts
-  version: 0.15.2
-digest: sha256:27c69a8b2d123287e38c83cf6aac98c7511d0565f8aa165989cf75239b5c32fb
-generated: "2026-10-19T19:04:20.871972005Z"
+  version: 0.16.0
+digest: sha256:eeae331b41fc40ffeec1fb0285d050c62e3623b5d46300e495e41a12657d2032
+generated: "2026-11-02T17:53:48.792893151Z"
